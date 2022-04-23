@@ -1,0 +1,7 @@
+# Request
+uint16 request_flag
+
+---
+
+# Response
+uint16 exit_flag
