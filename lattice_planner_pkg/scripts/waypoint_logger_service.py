@@ -2,15 +2,21 @@
 import rclpy
 from rclpy.node import Node
 
+# Paths
+import pathlib
+from ament_index_python.packages import get_package_share_directory
+
+# General
 import csv
 import numpy as np
-from ament_index_python.packages import get_package_share_directory
-import pathlib
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
-from pure_pursuit.srv import BasicService
+from laser_scan_helpers import get_range_at_angle
+
+# Messages & Services
+from lattice_planner_pkg.srv import BasicService
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Pose, Point, Quaternion
-from visualization_msgs.msg import MarkerArray, Marker
+from geometry_msgs.msg import Pose
+from sensor_msgs.msg import LaserScan
 
 
 class OdometryLogger(Node):
@@ -23,17 +29,21 @@ class OdometryLogger(Node):
 
         # Class Variables
         self.odom_pose = Pose()
+        self.left_distance = np.nan
+        self.right_distance = np.nan
 
         # Parameters
         odometry_topic = self.declare_parameter('odometry_topic').value
-        self.log_filename = self.declare_parameter('log_filename').value
+        lidar_scan_topic = self.declare_parameter('lidar_scan_topic').value
+        self.log_filepath = self.declare_parameter('log_filepath').value
 
         # Subscriptions & Service
         self.OdometrySubscription = self.create_subscription(
             Odometry, odometry_topic, self.odometry_callback, 1)
+        self.LaserScanSubscription = self.create_subscription(
+            LaserScan, lidar_scan_topic, self.laser_scan_callback, 1)
         self.LoggerService = self.create_service(
-            BasicService, 'odometry_logger_srv', self.logger_callback)
-
+            BasicService, '/lattice_planner_pkg/waypoint_logger_service', self.logger_callback)
 
     def odometry_callback(self, odom_msg):
         """
@@ -41,14 +51,21 @@ class OdometryLogger(Node):
         """
         self.odom_pose = odom_msg.pose.pose
 
+    def laser_scan_callback(self, scan_msg):
+        """
+        Odometry mesage callback.
+        """
+        self.right_distance = get_range_at_angle(
+            scan_msg.ranges, -0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max)
+        self.left_distance = get_range_at_angle(
+            scan_msg.ranges,  0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max)
+
     def logger_callback(self, request, response):
         """
         Log current odometry on `odometry_topic`.
         """
         # Make File if it Doesn't Exist
-        # pkg_dir = get_package_share_directory('pure_pursuit')
-        # filepath = pkg_dir + '/waypoints/' + self.log_filename + '.csv'
-        filepath = '/sim_ws/src/pure_pursuit' + '/waypoints/' + self.log_filename + '.csv'
+        filepath = self.log_filepath
         if not pathlib.Path(filepath).is_file():
             pathlib.Path(filepath).touch()
 
@@ -58,14 +75,17 @@ class OdometryLogger(Node):
         quat = [self.odom_pose.orientation.x, self.odom_pose.orientation.y,
                 self.odom_pose.orientation.z, self.odom_pose.orientation.w]
         _, _, yaw = euler_from_quaternion(quat)
+        wl = self.left_distance
+        wr = self.right_distance
 
         # Log to File
         with open(filepath, 'a', newline='') as csvfile:
-            field_names = ['x', 'y', 'yaw']
+            field_names = ['x', 'y', 'w_right', 'w_left']
             csvwriter = csv.DictWriter(csvfile, delimiter=',', fieldnames=field_names)
-            csvwriter.writerow({'x': x, 'y': y, 'yaw': yaw})
-            self.get_logger().info(f'Logging [x = {x}, y = {y}, yaw = {yaw}]')
-        
+            csvwriter.writerow({'x': x, 'y': y, 'w_right': wr, 'w_left': wl})
+            self.get_logger().info(
+                f'Logging [x = {x}, y = {y}, w_right = {wr}, w_left = {wl}')
+
         # Respond
         response.exit_flag = 0
         return response

@@ -17,5 +17,6 @@ pure_pursuit_node:
 waypoint_logger_service:
   ros__parameters:
     odometry_topic: '/ego_racecar/odom'
-    log_filename: 'sim_sparse'
+    lidar_scan_topic: '/scan'
+    log_filepath: '/sim_ws/src/lattice_planner_pkg/inputs/waypoints/sample_filename.csv'
 
