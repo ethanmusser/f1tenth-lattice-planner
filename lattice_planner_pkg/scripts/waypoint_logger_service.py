@@ -56,9 +56,9 @@ class OdometryLogger(Node):
         Odometry mesage callback.
         """
         self.right_distance = get_range_at_angle(
-            scan_msg.ranges, -0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max)
+            scan_msg.ranges, -0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
         self.left_distance = get_range_at_angle(
-            scan_msg.ranges,  0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max)
+            scan_msg.ranges,  0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
 
     def logger_callback(self, request, response):
         """
