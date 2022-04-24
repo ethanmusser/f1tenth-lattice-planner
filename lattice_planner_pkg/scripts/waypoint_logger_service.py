@@ -80,11 +80,11 @@ class OdometryLogger(Node):
 
         # Log to File
         with open(filepath, 'a', newline='') as csvfile:
-            field_names = ['x', 'y', 'w_right', 'w_left']
+            field_names = ['x', 'y', 'w_right', 'w_left', 'yaw']
             csvwriter = csv.DictWriter(csvfile, delimiter=',', fieldnames=field_names)
-            csvwriter.writerow({'x': x, 'y': y, 'w_right': wr, 'w_left': wl})
+            csvwriter.writerow({'x': x, 'y': y, 'w_right': wr, 'w_left': wl, 'yaw': yaw})
             self.get_logger().info(
-                f'Logging [x = {x}, y = {y}, w_right = {wr}, w_left = {wl}')
+                f'Logging [x = {x}, y = {y}, w_right = {wr}, w_left = {wl}, yaw = {yaw}')
 
         # Respond
         response.exit_flag = 0
