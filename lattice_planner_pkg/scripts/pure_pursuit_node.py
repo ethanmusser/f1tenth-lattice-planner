@@ -61,8 +61,9 @@ class PurePursuit(Node):
         self.WaypointMapvisualizer = self.create_publisher(MarkerArray, waypointmap_topic, 10)
 
         # Client
-        self.path = self.generate_waypoint_path(self.get_waypoint_path(), self.waypoint_distance)
+        # self.path = self.generate_waypoint_path(self.get_waypoint_path(), self.waypoint_distance)
         self.timer = self.create_timer(1.0, self.publish_waypoint_map_msg)
+        self.path = self.get_waypoint_path()
         
     def get_waypoint_path(self):
         """

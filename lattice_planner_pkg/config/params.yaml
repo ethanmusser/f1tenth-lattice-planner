@@ -6,12 +6,12 @@ pure_pursuit_node:
   ros__parameters:
     lookahead_distance: 1.2
     steering_angle_bound: 0.4
-    desired_speed: 3.0
+    desired_speed: 4.5
     min_speed: 1.0
     proportional_control: 1.0
     steering_angle_factor: 0.6
     speed_factor: 1.0
-    sparse_waypoint_filename: 'sim_sparse'
+    sparse_waypoint_filename: 'global_trajectory'
     waypoint_distance: 0.1
 
 waypoint_logger_service:
