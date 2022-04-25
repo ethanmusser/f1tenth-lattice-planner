@@ -32,7 +32,6 @@ class PurePursuit(Node):
         self.declare_parameter('lookahead_distance')
         self.declare_parameter('steering_angle_bound')
         self.declare_parameter('desired_speed')
-        self.declare_parameter('min_speed')
         self.declare_parameter('proportional_control')
         self.declare_parameter('steering_angle_factor')
         self.declare_parameter('speed_factor')
@@ -41,6 +40,8 @@ class PurePursuit(Node):
         self.declare_parameter('waypoint_distance')
         self.declare_parameter('min_lookahead')
         self.declare_parameter('max_lookahead')
+        self.declare_parameter('min_speed')
+        self.declare_parameter('max_speed')
 
         # Class Variables
         self.sparse_waypoint_filename = self.get_parameter('sparse_waypoint_filename').value
@@ -49,6 +50,8 @@ class PurePursuit(Node):
         self.min_lookahead = self.get_parameter('min_lookahead').value
         self.max_lookahead = self.get_parameter('max_lookahead').value
         self.lookahead_distance = self.get_parameter('lookahead_distance').value
+        self.min_speed = self.get_parameter('min_speed').value
+        self.max_speed = self.get_parameter('max_speed').value
 
         # Topics
         lidarscan_topic = '/scan'
@@ -207,7 +210,11 @@ class PurePursuit(Node):
         # speed = np.interp(abs(angle),
         #                   np.array([0.0, self.get_parameter('steering_angle_bound').value, np.inf]),
         #                   np.array([self.get_parameter('desired_speed').value, self.get_parameter('min_speed').value, self.get_parameter('min_speed').value]))
-        speed = velocity
+        preset_vel = velocity
+        # speed = np.interp(preset_vel,
+        #             np.array([np.min(self.velocity), np.max(self.velocity)]),
+        #             np.array([self.min_speed, self.max_speed]))
+        speed = preset_vel
         msg = AckermannDriveStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.drive.steering_angle = self.get_parameter('steering_angle_factor').value * angle
