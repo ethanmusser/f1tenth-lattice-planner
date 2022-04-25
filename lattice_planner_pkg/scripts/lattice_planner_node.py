@@ -93,18 +93,18 @@ class LatticePlanner(Node):
 
         # Estimate Ego Vehicle Position & Velocity
         # (here: simulation dummy, replace with actual sensor readings)
-        if self.traj_set[sel_action] is not None:
-            self.pos_est, self.vel_est = graph_ltpl.testing_tools.src.vdc_dummy.\
-                vdc_dummy(pos_est=self.pos_est,
-                          last_s_course=(self.traj_set[sel_action][0][:, 0]),
-                          last_path=(self.traj_set[sel_action][0][:, 1:3]),
-                          last_vel_course=(self.traj_set[sel_action][0][:, 5]),
-                          iter_time=(self.get_clock().now().nanoseconds - self.tic.nanoseconds)*1.0e9)
-        self.tic = self.get_clock().now()
+        # if self.traj_set[sel_action] is not None:
+        #     self.pos_est, self.vel_est = graph_ltpl.testing_tools.src.vdc_dummy.\
+        #         vdc_dummy(pos_est=self.pos_est,
+        #                   last_s_course=(self.traj_set[sel_action][0][:, 0]),
+        #                   last_path=(self.traj_set[sel_action][0][:, 1:3]),
+        #                   last_vel_course=(self.traj_set[sel_action][0][:, 5]),
+        #                   iter_time=(self.get_clock().now().nanoseconds - self.tic.nanoseconds)*1.0e9)
+        # self.tic = self.get_clock().now()
 
         # Compute Velocity Profile & Retrieve Tajectories
-        self.traj_set = self.ltpl_obj.calc_vel_profile(pos_est=self.pos_est,
-                                                       vel_est=self.vel_est)[0]
+        self.traj_set = self.ltpl_obj.calc_vel_profile(pos_est=self.pos,
+                                                       vel_est=self.vel)[0]
 
         # Send Trajectories to Controller
         # select a trajectory from the set and send it to the controller here
