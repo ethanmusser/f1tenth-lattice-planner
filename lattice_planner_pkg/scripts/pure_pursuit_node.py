@@ -38,10 +38,14 @@ class PurePursuit(Node):
         self.declare_parameter('speed_factor')
         self.declare_parameter('sparse_waypoint_filename')
         self.declare_parameter('waypoint_distance')
+        self.declare_parameter('min_lookahead')
+        self.declare_parameter('max_lookahead')
 
         # Class Variables
         self.sparse_waypoint_filename = self.get_parameter('sparse_waypoint_filename').value
         self.waypoint_distance = self.get_parameter('waypoint_distance').value
+        self.min_lookahead = self.get_parameter('min_lookahead').value
+        self.max_lookahead = self.get_parameter('max_lookahead').value
         self.lookahead_distance = self.get_parameter('lookahead_distance').value
 
         # Topics
@@ -62,20 +66,72 @@ class PurePursuit(Node):
 
         # Client
         # self.path = self.generate_waypoint_path(self.get_waypoint_path(), self.waypoint_distance)
-        self.timer = self.create_timer(1.0, self.publish_waypoint_map_msg)
-        self.path = self.get_waypoint_path()
         
+        self.path, self.k_values, self.velocity = self.get_waypoint_path()
+        self.timer = self.create_timer(1.0, self.publish_waypoint_map_msg)
+    
+    def find_cur_idx(self, odom_msg):
+        position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
+        point_dist = np.linalg.norm(self.path[:, 0:2] - position, axis=1)
+        cur_idx = np.argmin(point_dist)
+        return cur_idx
+
+    def compute_lookahead(self, cur_idx):
+        #velocity based lookahead
+        # min_vel = np.min(self.velocity)
+        # max_vel = np.max(self.velocity)
+        # lookahead = np.interp(self.velocity[cur_idx],
+        #             np.array([min_vel, max_vel]),
+        #             np.array([self.min_lookahead, self.max_lookahead]))
+        # #curvature based lookahead
+        min_curv = np.min(abs(self.k_values))
+        max_curv = np.max(abs(self.k_values))
+        lookahead = np.interp(self.k_values[cur_idx],
+                    np.array([min_curv, max_curv]),
+                    np.array([self.min_lookahead, self.max_lookahead]))
+        # lookahead = self.lookahead_distance
+        # print('lookahead: ', lookahead)
+        return lookahead
+
+    def get_cur_waypoint(self, cur_idx, odom_msg, lookahead):
+        position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
+        point_dist = np.linalg.norm(self.path[:, 0:2] - position, axis=1)
+        while True:
+            cur_idx = (cur_idx + 1) % np.size(self.path, axis=0)
+            dis_diff = point_dist[cur_idx] - lookahead
+            if dis_diff < 0:
+                continue
+            elif dis_diff > 0:
+                x_w = np.interp(lookahead,
+                    np.array([point_dist[cur_idx - 1], point_dist[cur_idx]]),
+                    np.array([self.path[cur_idx - 1, 0], self.path[cur_idx, 0]]))
+                y_w = np.interp(lookahead,
+                    np.array([point_dist[cur_idx - 1], point_dist[cur_idx]]),
+                    np.array([self.path[cur_idx - 1, 1], self.path[cur_idx, 1]]))
+                break
+            else:
+                x_w = self.path[cur_idx, 0]
+                y_w = self.path[cur_idx, 1]
+                break
+
+        return x_w, y_w
+
     def get_waypoint_path(self):
         """
         """
         # Read Waypoint CSV
-        pkg_dir = get_package_share_directory('pure_pursuit')
-        filepath = pkg_dir + '/waypoints/' + self.sparse_waypoint_filename + '.csv'
+        pkg_dir = get_package_share_directory('lattice_planner_pkg')
+        filepath = pkg_dir + '/inputs/global_traj/' + self.sparse_waypoint_filename + '.csv'
         if not pathlib.Path(filepath).is_file():
             pathlib.Path(filepath).touch()
-        data = np.genfromtxt(filepath, delimiter=',')
+        data = np.genfromtxt(filepath, delimiter=';')
+        x = data[:,0] + data[:,4]*data[:,6]
+        y = data[:,1] + data[:,5]*data[:,6]
+        xy = np.array([x,y]).transpose()
+        curvature = data[:,9]
+        velocity = data[:,10]
         # data = 15 * np.random.rand(20, 3)
-        return data
+        return xy, curvature, velocity
         
     def path_to_array(self, path):
         """
@@ -89,7 +145,7 @@ class PurePursuit(Node):
         
         return arr
 
-    def generate_waypoint_path(self, sparse_points, waypoint_distance):
+    def generate_waypoint_path(self, sparse_points, waypoint_distance, skip_header=3):
         """
         Callback for path service.
         """
@@ -106,35 +162,6 @@ class PurePursuit(Node):
         dense_points = np.array([dense_points[0], dense_points[1], dense_points[2]]).transpose()
 
         return dense_points
-
-
-    def find_current_waypoint(self, odom_msg):
-        """
-        Find waypoint to track on based on lookahead distance.
-        """
-        position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
-        point_dist = np.linalg.norm(self.path[:, 0:2] - position, axis=1)
-        search_index = np.argmin(point_dist)
-        while True:
-            search_index = (search_index + 1) % np.size(self.path, axis=0)
-            self.publish_waypoint_msg(self.path[search_index, 0], self.path[search_index, 1])
-            dis_diff = point_dist[search_index] - self.lookahead_distance
-            if dis_diff < 0:
-                continue
-            elif dis_diff > 0:
-                x_goal = np.interp(self.lookahead_distance,
-                    np.array([point_dist[search_index - 1], point_dist[search_index]]),
-                    np.array([self.path[search_index - 1, 0], self.path[search_index, 0]]))
-                y_goal = np.interp(self.lookahead_distance,
-                    np.array([point_dist[search_index - 1], point_dist[search_index]]),
-                    np.array([self.path[search_index - 1, 1], self.path[search_index, 1]]))
-                break
-            else:
-                x_goal = self.path[search_index, 0]
-                y_goal = self.path[search_index, 1]
-                break
-
-        return x_goal, y_goal
 
     def transform_point(self, odom_msg, goalx, goaly):
         """
@@ -167,17 +194,17 @@ class PurePursuit(Node):
         desired_angle = curvature * self.get_parameter('proportional_control').value
         return desired_angle
 
-    def publish_drive_msg(self, desired_angle):
+    def publish_drive_msg(self, desired_angle, velocity):
         """
         """
         # Compute Control Input
         angle = np.clip(desired_angle,
                         -self.get_parameter('steering_angle_bound').value,
                         self.get_parameter('steering_angle_bound').value)
-        speed = np.interp(abs(angle),
-                          np.array([0.0, self.get_parameter('steering_angle_bound').value, np.inf]),
-                          np.array([self.get_parameter('desired_speed').value, self.get_parameter('min_speed').value, self.get_parameter('min_speed').value]))
-
+        # speed = np.interp(abs(angle),
+        #                   np.array([0.0, self.get_parameter('steering_angle_bound').value, np.inf]),
+        #                   np.array([self.get_parameter('desired_speed').value, self.get_parameter('min_speed').value, self.get_parameter('min_speed').value]))
+        speed = velocity
         msg = AckermannDriveStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.drive.steering_angle = self.get_parameter('steering_angle_factor').value * angle
@@ -220,8 +247,12 @@ class PurePursuit(Node):
             marker.scale.x = 0.1
             marker.scale.y = 0.1
             marker.scale.z = 0.1
-            marker.color.r = 0.0
-            marker.color.g = 255.0
+            marker.color.r = np.interp(self.velocity[idx], 
+                    np.array([0.0, np.max(self.velocity)]),
+                    np.array([255.0, 0.0]))
+            marker.color.g = np.interp(self.velocity[idx], 
+                    np.array([0.0, np.max(self.velocity)]),
+                    np.array([0.0, 255.0]))
             marker.color.b = 0.0
             marker.color.a = 1.0
             pt = Point()
@@ -237,16 +268,20 @@ class PurePursuit(Node):
     def pose_callback(self, odom_msg):
         """
         """
-        pass
-        # TODO: find the current waypoint to track using methods mentioned in lecture
-        goal_x_world, goal_y_world = self.find_current_waypoint(odom_msg)
+        #identify current index position on map
+        cur_idx = self.find_cur_idx(odom_msg)
+        # print('cur_vel:', self.velocity[cur_idx])
+        #obtain appropriate lookahead
+        lookahead = self.compute_lookahead(cur_idx)
+        #get waypoint to follow based on new lookahead
+        x_w, y_w = self.get_cur_waypoint(cur_idx, odom_msg, lookahead)
         # TODO: transform goal point to vehicle frame of reference
-        goal_x_body, goal_y_body = self.transform_point(odom_msg, goal_x_world, goal_y_world)
+        goal_x_body, goal_y_body = self.transform_point(odom_msg, x_w, y_w)
         # TODO: calculate curvature/steering angle
         desired_angle = self.compute_steering_angle(odom_msg, goal_y_body)
         # TODO: publish drive message, don't forget to limit the steering angle.
-        self.publish_waypoint_msg(goal_x_world, goal_y_world)
-        self.publish_drive_msg(desired_angle)
+        self.publish_waypoint_msg(x_w, y_w)
+        self.publish_drive_msg(desired_angle, self.velocity[cur_idx])
 
 
 def main(args=None):
