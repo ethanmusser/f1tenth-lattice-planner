@@ -61,6 +61,7 @@ install(PROGRAMS
   scripts/pure_pursuit_node.py
   scripts/waypoint_logger_service.py
   scripts/laser_scan_helpers.py
+  scripts/graph_ltpl_helpers.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

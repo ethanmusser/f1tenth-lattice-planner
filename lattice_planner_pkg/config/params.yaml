@@ -1,6 +1,9 @@
 lattice_planner_node:
   ros__parameters:
-    temp: False
+    track_specifier: 'skirkanich3'
+    toppath: '/sim_ws/src/lattice_planner_pkg'
+    mappath: '/sim_ws/src/f1tenth_gym_ros/maps/skirkanich_front_friday'
+    odometry_topic: '/ego_racecar/odom'
 
 pure_pursuit_node:
   ros__parameters:
