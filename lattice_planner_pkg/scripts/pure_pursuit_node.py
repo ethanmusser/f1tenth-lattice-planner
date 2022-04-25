@@ -128,7 +128,7 @@ class PurePursuit(Node):
         filepath = pkg_dir + '/inputs/traj_ltpl_cl/' + self.sparse_waypoint_filename + '.csv'
         if not pathlib.Path(filepath).is_file():
             pathlib.Path(filepath).touch()
-        data = np.genfromtxt(filepath, delimiter=';', )
+        data = np.genfromtxt(filepath, delimiter=',', )
         # print('filepath:', filepath)
         # x = data[:,0] + data[:,4]*data[:,6]
         # y = data[:,1] + data[:,5]*data[:,6]
