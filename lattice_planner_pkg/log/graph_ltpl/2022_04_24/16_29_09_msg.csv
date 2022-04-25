@@ -1,0 +1,2 @@
+time;type;message
+1650832201.7676558;WARNING;Warning: One trajectory generation iteration took more than 0.100s (Actual calculation time: 1.430s)

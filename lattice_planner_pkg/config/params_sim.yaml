@@ -9,19 +9,17 @@ pure_pursuit_node:
   ros__parameters:
     lookahead_distance: 1.2
     steering_angle_bound: 0.4
-    desired_speed: 6.0
+    desired_speed: 4.5
     min_speed: 1.0
-    proportional_control: 0.8 #1.0
+    proportional_control: 1.0
     steering_angle_factor: 0.6
     speed_factor: 1.0
-    sparse_waypoint_file: 'traj_Itpl_cl_skirkanich4'
+    sparse_waypoint_filename: 'traj_ltpl_cl_skirkanich3'
     waypoint_distance: 0.1
-    min_lookahead: 1.2
-    max_lookahead: 1.6
 
 waypoint_logger_service:
   ros__parameters:
-    odometry_topic: '/pf/pose/odom'
+    odometry_topic: '/ego_racecar/odom'
     lidar_scan_topic: '/scan'
-    log_filepath: '/f1tenth_ws/src/lattice_planner_pkg/inputs/waypoints/skirkanich_front_sunday.csv'
+    log_filepath: '/sim_ws/src/lattice_planner_pkg/inputs/waypoints/sample_filename.csv'
 

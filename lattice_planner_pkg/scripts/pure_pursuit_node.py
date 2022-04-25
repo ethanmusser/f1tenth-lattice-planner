@@ -121,10 +121,10 @@ class PurePursuit(Node):
         """
         # Read Waypoint CSV
         pkg_dir = get_package_share_directory('lattice_planner_pkg')
-        filepath = pkg_dir + '/inputs/global_traj/' + self.sparse_waypoint_filename + '.csv'
+        filepath = pkg_dir + '/inputs/traj_ltpl_cl/' + self.sparse_waypoint_filename + '.csv'
         if not pathlib.Path(filepath).is_file():
             pathlib.Path(filepath).touch()
-        data = np.genfromtxt(filepath, delimiter=';')
+        data = np.genfromtxt(filepath, delimiter=';', skip_header = 3)
         x = data[:,0] + data[:,4]*data[:,6]
         y = data[:,1] + data[:,5]*data[:,6]
         xy = np.array([x,y]).transpose()
