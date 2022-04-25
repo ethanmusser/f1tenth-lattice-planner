@@ -37,12 +37,14 @@ class PurePursuit(Node):
         self.declare_parameter('steering_angle_factor')
         self.declare_parameter('speed_factor')
         self.declare_parameter('sparse_waypoint_filename')
+        self.declare_parameter('odometry_topic')
         self.declare_parameter('waypoint_distance')
         self.declare_parameter('min_lookahead')
         self.declare_parameter('max_lookahead')
 
         # Class Variables
         self.sparse_waypoint_filename = self.get_parameter('sparse_waypoint_filename').value
+        odometry_topic = self.get_parameter('odometry_topic').value
         self.waypoint_distance = self.get_parameter('waypoint_distance').value
         self.min_lookahead = self.get_parameter('min_lookahead').value
         self.max_lookahead = self.get_parameter('max_lookahead').value
@@ -51,9 +53,6 @@ class PurePursuit(Node):
         # Topics
         lidarscan_topic = '/scan'
         drive_topic = '/drive'
-        # odometry_topic = '/odom'
-        odometry_topic = '/ego_racecar/odom'
-        # odometry_topic = '/pf/pose/odom'
         waypoint_topic = '/pure_pursuit/waypoint'
         waypointmap_topic = '/pure_pursuit/waypoint_map'
 
@@ -86,6 +85,8 @@ class PurePursuit(Node):
         # #curvature based lookahead
         min_curv = np.min(abs(self.k_values))
         max_curv = np.max(abs(self.k_values))
+        # print('min_lookahead', self.min_lookahead)
+        # print('max_lookahead', self.max_lookahead)
         lookahead = np.interp(self.k_values[cur_idx],
                     np.array([min_curv, max_curv]),
                     np.array([self.min_lookahead, self.max_lookahead]))
@@ -124,12 +125,14 @@ class PurePursuit(Node):
         filepath = pkg_dir + '/inputs/traj_ltpl_cl/' + self.sparse_waypoint_filename + '.csv'
         if not pathlib.Path(filepath).is_file():
             pathlib.Path(filepath).touch()
-        data = np.genfromtxt(filepath, delimiter=';', skip_header = 3)
-        x = data[:,0] + data[:,4]*data[:,6]
-        y = data[:,1] + data[:,5]*data[:,6]
-        xy = np.array([x,y]).transpose()
-        curvature = data[:,9]
-        velocity = data[:,10]
+        data = np.genfromtxt(filepath, delimiter=';', )
+        # print('filepath:', filepath)
+        # x = data[:,0] + data[:,4]*data[:,6]
+        # y = data[:,1] + data[:,5]*data[:,6]
+        # xy = np.array([x,y]).transpose()
+        xy = data[:,1:3]
+        curvature = data[:,4]
+        velocity = data[:,5]
         # data = 15 * np.random.rand(20, 3)
         return xy, curvature, velocity
         
