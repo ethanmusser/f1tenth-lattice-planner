@@ -11,7 +11,7 @@ pure_pursuit_node:
     proportional_control: 0.8 #1.0
     steering_angle_factor: 0.6
     speed_factor: 1.0
-    sparse_waypoint_filename: 'traj_ltpl_cl_skirkanich4'
+    sparse_waypoint_filename: 'traj_Itpl_cl_skirkanich4'
     waypoint_distance: 0.1
     min_lookahead: 1.2
     max_lookahead: 1.6
