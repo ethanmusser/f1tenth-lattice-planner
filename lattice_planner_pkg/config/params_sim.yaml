@@ -13,13 +13,13 @@ pure_pursuit_node:
     proportional_control: 0.8
     steering_angle_factor: 0.6
     speed_factor: 1.0
-    sparse_waypoint_filename: 'traj_race_cl_skirkanich6_ax12'
+    sparse_waypoint_filename: 'traj_race_cl_skirkanich_12ax_8gg'
     odometry_topic: '/ego_racecar/odom'
     waypoint_distance: 0.1
     min_lookahead: 1.6
     max_lookahead: 1.6
-    min_speed: 4.0
-    max_speed: 6.0
+    min_speed: 2.0
+    max_speed: 6.5
 
 waypoint_logger_service:
   ros__parameters:

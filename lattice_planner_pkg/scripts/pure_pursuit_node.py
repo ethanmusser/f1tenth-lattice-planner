@@ -258,10 +258,10 @@ class PurePursuit(Node):
             marker.scale.y = 0.1
             marker.scale.z = 0.1
             marker.color.r = np.interp(self.velocity[idx], 
-                    np.array([0.0, np.max(self.velocity)]),
+                    np.array([np.min(self.velocity), np.max(self.velocity)]),
                     np.array([255.0, 0.0]))
             marker.color.g = np.interp(self.velocity[idx], 
-                    np.array([0.0, np.max(self.velocity)]),
+                    np.array([np.min(self.velocity), np.max(self.velocity)]),
                     np.array([0.0, 255.0]))
             marker.color.b = 0.0
             marker.color.a = 1.0
