@@ -16,10 +16,6 @@ def generate_launch_description():
         )
 
     ld = LaunchDescription([
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([os.path.join(get_package_share_directory(
-                'f1tenth_gym_ros'), 'launch'), '/gym_bridge_launch.py'])
-        ),
         Node(
             package="lattice_planner_pkg",
             executable="waypoint_logger_service.py",
