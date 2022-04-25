@@ -58,10 +58,10 @@ class PurePursuit(Node):
 
         # Subscribers & Publishers
         self.particle_filterSubscription = self.create_subscription(
-            Odometry, odometry_topic, self.pose_callback, 10)
-        self.AckPublisher = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
-        self.WaypointVisualizer = self.create_publisher(Marker, waypoint_topic, 10)
-        self.WaypointMapvisualizer = self.create_publisher(MarkerArray, waypointmap_topic, 10)
+            Odometry, odometry_topic, self.pose_callback, 1)
+        self.AckPublisher = self.create_publisher(AckermannDriveStamped, drive_topic, 1)
+        self.WaypointVisualizer = self.create_publisher(Marker, waypoint_topic, 1)
+        self.WaypointMapvisualizer = self.create_publisher(MarkerArray, waypointmap_topic, 1)
 
         # Client
         # self.path = self.generate_waypoint_path(self.get_waypoint_path(), self.waypoint_distance)
@@ -77,19 +77,19 @@ class PurePursuit(Node):
 
     def compute_lookahead(self, cur_idx):
         #velocity based lookahead
-        # min_vel = np.min(self.velocity)
-        # max_vel = np.max(self.velocity)
-        # lookahead = np.interp(self.velocity[cur_idx],
-        #             np.array([min_vel, max_vel]),
-        #             np.array([self.min_lookahead, self.max_lookahead]))
+        min_vel = np.min(self.velocity)
+        max_vel = np.max(self.velocity)
+        lookahead = np.interp(self.velocity[cur_idx],
+                    np.array([min_vel, max_vel]),
+                    np.array([self.min_lookahead, self.max_lookahead]))
         # #curvature based lookahead
-        min_curv = np.min(abs(self.k_values))
-        max_curv = np.max(abs(self.k_values))
+        # min_curv = np.min(abs(self.k_values))
+        # max_curv = np.max(abs(self.k_values))
         # print('min_lookahead', self.min_lookahead)
         # print('max_lookahead', self.max_lookahead)
-        lookahead = np.interp(self.k_values[cur_idx],
-                    np.array([min_curv, max_curv]),
-                    np.array([self.min_lookahead, self.max_lookahead]))
+        # lookahead = np.interp(self.k_values[cur_idx],
+        #             np.array([min_curv, max_curv]),
+        #             np.array([self.min_lookahead, self.max_lookahead]))
         # lookahead = self.lookahead_distance
         # print('lookahead: ', lookahead)
         return lookahead
@@ -188,12 +188,12 @@ class PurePursuit(Node):
 
         return goal_b[0], goal_b[1]
 
-    def compute_steering_angle(self, odom_msg, y_goal_b):
+    def compute_steering_angle(self, odom_msg, y_goal_b, lookahead):
         """
         Curvature calculation
         """
         y = y_goal_b 
-        curvature = (2 * y) / self.lookahead_distance ** 2
+        curvature = (2 * y) / lookahead ** 2
         desired_angle = curvature * self.get_parameter('proportional_control').value
         return desired_angle
 
@@ -281,7 +281,7 @@ class PurePursuit(Node):
         # TODO: transform goal point to vehicle frame of reference
         goal_x_body, goal_y_body = self.transform_point(odom_msg, x_w, y_w)
         # TODO: calculate curvature/steering angle
-        desired_angle = self.compute_steering_angle(odom_msg, goal_y_body)
+        desired_angle = self.compute_steering_angle(odom_msg, goal_y_body, lookahead)
         # TODO: publish drive message, don't forget to limit the steering angle.
         self.publish_waypoint_msg(x_w, y_w)
         self.publish_drive_msg(desired_angle, self.velocity[cur_idx])
