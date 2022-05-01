@@ -4,7 +4,9 @@ lattice_planner_node:
     toppath: '/sim_ws/src/lattice_planner_pkg'
     mappath: '/sim_ws/src/f1tenth_gym_ros/maps/skirkanich_front_sunday'
     odometry_topic: '/ego_racecar/odom'
-    local_plan_update_period: 0.2
+    trajectory_topic: '/lat/local_traj'
+    visual_mode: False
+    log_mode: False
 
 pure_pursuit_node:
   ros__parameters:

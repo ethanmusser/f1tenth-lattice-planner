@@ -7,6 +7,7 @@ import rclpy
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 from time import sleep
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import yaml
 
 # System
@@ -24,14 +25,18 @@ class LatticePlanner(Node):
         self.declare_parameter('mappath')
         self.declare_parameter('track_specifier')
         self.declare_parameter('odometry_topic')
-        self.declare_parameter('local_plan_update_period')
+        self.declare_parameter('trajectory_topic')
+        self.declare_parameter('visual_mode')
+        self.declare_parameter('log_mode')
 
         # Read Parameters
         self.toppath = self.get_parameter('toppath').value
         self.track_specifier = self.get_parameter('track_specifier').value
         self.mappath = self.get_parameter('mappath').value
         odom_topic = self.get_parameter('odometry_topic').value
-        update_period = self.get_parameter('local_plan_update_period').value
+        traj_topic = self.get_parameter('trajectory_topic').value
+        self.visual_mode = self.get_parameter('visual_mode').value
+        self.log_mode = self.get_parameter('log_mode').value
 
         # Class Members
         self.pos = None
@@ -43,14 +48,14 @@ class LatticePlanner(Node):
 
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
-        # self.local_plan_timer = self.create_timer(update_period, self.update_local_plan)
+        self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
 
     def initialize_graph_ltpl(self):
         # Intialize Graph_LTPL Class
         path_dict = get_path_dict(self.toppath, self.track_specifier)
         self.ltpl_obj = graph_ltpl.Graph_LTPL.Graph_LTPL(path_dict=path_dict,
-                                                         visual_mode=False,
-                                                         log_to_file=False)
+                                                         visual_mode=self.visual_mode,
+                                                         log_to_file=self.log_mode)
 
         # Calculate Offline Graph
         self.ltpl_obj.graph_init()
@@ -87,16 +92,29 @@ class LatticePlanner(Node):
         # Compute Velocity Profile & Retrieve Tajectories
         self.traj_set = self.ltpl_obj.calc_vel_profile(pos_est=self.pos,
                                                        vel_est=self.vel)[0]
+        
+        # Publish Selected Trajectory
+        self.publish_local_traj(self.traj_set[sel_action][0])
+
+        # Log & Visualize (if enabled)
+        self.ltpl_obj.log()
+        self.ltpl_obj.visual()
+    
+    def publish_local_traj(self, traj):
+        # Write Local Trajectory to ROS Message
+        msg = JointTrajectory()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        for wp in traj:
+            pt = JointTrajectoryPoint()
+            pt.positions.append(wp[1])
+            pt.positions.append(wp[2])
+            pt.velocities.append(wp[5])
+            msg.points.append(pt)
 
         # Send Trajectories to Controller
         # select a trajectory from the set and send it to the controller here
-        # self.publish_
-        print(self.traj_set)
-        print(np.shape(self.traj_set['straight']))
+        self.traj_pub.publish(msg)
 
-        # Log
-        self.ltpl_obj.log()
-    
     def odom_callback(self, odom_msg):
         # Convert Odom
         pose = odom_msg.pose.pose
@@ -111,7 +129,7 @@ class LatticePlanner(Node):
         if not self.graph_ltpl_up:
             self.initialize_graph_ltpl()
         
-        # Run Local Planner
+        # Run Local Planner & Publish Commands
         self.update_local_plan()
 
 
