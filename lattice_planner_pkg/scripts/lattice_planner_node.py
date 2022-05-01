@@ -50,11 +50,8 @@ class LatticePlanner(Node):
 
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
-<<<<<<< Updated upstream
         self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
-=======
-        # self.local_plan_timer = self.create_timer(update_period, self.update_local_plan)
-        waypointmap_topic = '/pure_pursuit/waypoint_map'
+        waypointmap_topic = '/lattice_plan/waypoint_map'
         self.WaypointMapvisualizer = self.create_publisher(MarkerArray, waypointmap_topic, 10)
 
     def publish_waypoint_map_msg(self, arr):
@@ -84,19 +81,13 @@ class LatticePlanner(Node):
             marker_array.markers.append(marker)
 
         self.WaypointMapvisualizer.publish(marker_array)
->>>>>>> Stashed changes
 
     def initialize_graph_ltpl(self):
         # Intialize Graph_LTPL Class
         path_dict = get_path_dict(self.toppath, self.track_specifier)
         self.ltpl_obj = graph_ltpl.Graph_LTPL.Graph_LTPL(path_dict=path_dict,
-<<<<<<< Updated upstream
                                                          visual_mode=self.visual_mode,
                                                          log_to_file=self.log_mode)
-=======
-                                                         visual_mode=True,
-                                                         log_to_file=False)
->>>>>>> Stashed changes
 
         # Calculate Offline Graph
         self.ltpl_obj.graph_init()
@@ -137,6 +128,12 @@ class LatticePlanner(Node):
         # Publish Selected Trajectory
         self.publish_local_traj(self.traj_set[sel_action][0])
 
+        # print(self.traj_set)
+        # print('traj shape', self.traj_set[sel_action].shape)
+        # print('traj shape', np.array([self.traj_set[sel_action][0][0][1:3]]))
+        self.publish_waypoint_map_msg(np.array([self.traj_set[sel_action][0][0][1:3]]))
+        # print(np.shape(self.traj_set['straight']))
+
         # Log & Visualize (if enabled)
         self.ltpl_obj.log()
         self.ltpl_obj.visual()
@@ -154,23 +151,8 @@ class LatticePlanner(Node):
 
         # Send Trajectories to Controller
         # select a trajectory from the set and send it to the controller here
-<<<<<<< Updated upstream
         self.traj_pub.publish(msg)
 
-=======
-        # self.publish_
-        # print(self.traj_set)
-        print('traj shape', self.traj_set[sel_action].shape)
-        # print('traj shape', np.array([self.traj_set[sel_action][0][0][1:3]]))
-        self.publish_waypoint_map_msg(np.array([self.traj_set[sel_action][0][0][1:3]]))
-        # print(np.shape(self.traj_set['straight']))
-
-        # Log
-        self.ltpl_obj.log()
-        # logging
-        # self.ltpl_obj.visual()
-
->>>>>>> Stashed changes
     def odom_callback(self, odom_msg):
         # Convert Odom
         pose = odom_msg.pose.pose
