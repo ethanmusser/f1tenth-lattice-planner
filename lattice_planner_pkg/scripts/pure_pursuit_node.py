@@ -17,8 +17,6 @@ from tf_transformations import euler_from_quaternion, quaternion_from_euler, qua
 from ament_index_python.packages import get_package_share_directory
 import pathlib
 
-# package_path = rospack.get_path('lab6-slam-and-pure-pursuit-team_07')
-# Waypoints = np.genfromtxt(package_path+'/pure-pursuit/datapoints.csv', delimiter=',')[:, :2]
 
 class PurePursuit(Node):
     """ 

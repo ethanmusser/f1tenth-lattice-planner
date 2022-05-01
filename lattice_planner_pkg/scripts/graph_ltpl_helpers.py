@@ -17,3 +17,9 @@ def get_path_dict(toppath, track_specifier):
                  }
     return path_dict
 
+
+def get_traj_line(refline, norm_vec, alpha):
+    assert len(refline) == len(norm_vec), "Lengths of all inputs must be equal."
+    assert len(refline) == len(alpha), "Lengths of all inputs must be equal."
+    return [refline[i] + alpha[i] * norm_vec[i] for i in range(len(refline))]
+

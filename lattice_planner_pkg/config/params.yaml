@@ -4,7 +4,9 @@ lattice_planner_node:
     toppath: '/sim_ws/src/lattice_planner_pkg'
     mappath: '/sim_ws/src/f1tenth_gym_ros/maps/skirkanich_front_friday'
     odometry_topic: '/pf/pose/odom'
-    trajectory_topic: '/lat/local_traj'
+    trajectory_topic: '/lattice_planner/local_traj'
+    global_traj_vis_topic: '/lattice_planner/global_traj_vis_topic'
+    local_traj_vis_topic: '/lattice_planner/local_traj_vis_topic'
     visual_mode: False
     log_mode: False
 

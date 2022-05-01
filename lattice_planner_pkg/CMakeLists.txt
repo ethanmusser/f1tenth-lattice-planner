@@ -63,6 +63,7 @@ install(PROGRAMS
   scripts/waypoint_logger_service.py
   scripts/laser_scan_helpers.py
   scripts/graph_ltpl_helpers.py
+  scripts/visualization_helpers.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
