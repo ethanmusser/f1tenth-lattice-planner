@@ -17,7 +17,7 @@ pure_pursuit_node:
     sparse_waypoint_filename: 'traj_race_cl_skirkanich4'
     odometry_topic: '/ego_racecar/odom'
     waypoint_distance: 0.1
-    min_lookahead: 1.2
+    min_lookahead: 1.6
     max_lookahead: 1.6
 
 waypoint_logger_service:
