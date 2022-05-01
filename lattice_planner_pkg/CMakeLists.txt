@@ -18,6 +18,7 @@ foreach(PACKAGE
   rclpy 
   geometry_msgs
   nav_msgs
+  trajectory_msgs
   ackermann_msgs
   sensor_msgs
   std_msgs

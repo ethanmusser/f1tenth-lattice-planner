@@ -10,7 +10,7 @@ def generate_launch_description():
     config = os.path.join(
         get_package_share_directory('lattice_planner_pkg'),
         'config',
-        'params.yaml'
+        'params_sim.yaml'
         )
     
     ld = LaunchDescription([
