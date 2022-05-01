@@ -9,6 +9,8 @@ from tf_transformations import euler_from_quaternion, quaternion_from_euler
 from time import sleep
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import yaml
+from visualization_msgs.msg import MarkerArray, Marker
+from geometry_msgs.msg import PoseStamped, Point
 
 # System
 import os
@@ -48,14 +50,53 @@ class LatticePlanner(Node):
 
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
+<<<<<<< Updated upstream
         self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
+=======
+        # self.local_plan_timer = self.create_timer(update_period, self.update_local_plan)
+        waypointmap_topic = '/pure_pursuit/waypoint_map'
+        self.WaypointMapvisualizer = self.create_publisher(MarkerArray, waypointmap_topic, 10)
+
+    def publish_waypoint_map_msg(self, arr):
+        """
+        """
+        marker_array = MarkerArray()
+        for idx, ps in enumerate(arr):
+            marker = Marker()
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.header.frame_id = 'map'
+            marker.id = idx
+            marker.type = marker.SPHERE
+            marker.pose.position.x = ps[0]
+            marker.pose.position.y = ps[1]
+            marker.scale.x = 0.1
+            marker.scale.y = 0.1
+            marker.scale.z = 0.1
+            marker.color.r = 0.0
+            marker.color.g = 255.0
+            marker.color.b = 0.0
+            marker.color.a = 1.0
+            pt = Point()
+            pt.x = marker.pose.position.x
+            pt.y = marker.pose.position.y
+            marker.points.append(pt)
+            # marker.lifetime = rclpy.duration.Duration(seconds=0.5)
+            marker_array.markers.append(marker)
+
+        self.WaypointMapvisualizer.publish(marker_array)
+>>>>>>> Stashed changes
 
     def initialize_graph_ltpl(self):
         # Intialize Graph_LTPL Class
         path_dict = get_path_dict(self.toppath, self.track_specifier)
         self.ltpl_obj = graph_ltpl.Graph_LTPL.Graph_LTPL(path_dict=path_dict,
+<<<<<<< Updated upstream
                                                          visual_mode=self.visual_mode,
                                                          log_to_file=self.log_mode)
+=======
+                                                         visual_mode=True,
+                                                         log_to_file=False)
+>>>>>>> Stashed changes
 
         # Calculate Offline Graph
         self.ltpl_obj.graph_init()
@@ -113,8 +154,23 @@ class LatticePlanner(Node):
 
         # Send Trajectories to Controller
         # select a trajectory from the set and send it to the controller here
+<<<<<<< Updated upstream
         self.traj_pub.publish(msg)
 
+=======
+        # self.publish_
+        # print(self.traj_set)
+        print('traj shape', self.traj_set[sel_action].shape)
+        # print('traj shape', np.array([self.traj_set[sel_action][0][0][1:3]]))
+        self.publish_waypoint_map_msg(np.array([self.traj_set[sel_action][0][0][1:3]]))
+        # print(np.shape(self.traj_set['straight']))
+
+        # Log
+        self.ltpl_obj.log()
+        # logging
+        # self.ltpl_obj.visual()
+
+>>>>>>> Stashed changes
     def odom_callback(self, odom_msg):
         # Convert Odom
         pose = odom_msg.pose.pose
