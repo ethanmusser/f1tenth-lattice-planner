@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from visualization_helpers import wp_vis_msg, wp_map_pt_vis_msg, wp_map_line_vis_msg
+from visualization_helpers import wp_vis_msg, wp_map_pt_vis_msg, wp_map_line_vis_msg, wp_map_line_with_vel_vis_msg
 from nav_msgs.msg import Odometry
 from graph_ltpl_helpers import get_path_dict, get_traj_line
 import graph_ltpl
@@ -148,7 +148,8 @@ class LatticePlanner(Node):
         self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line, self.get_clock().now().to_msg()))
 
     def global_traj_vis_timer_callback(self):
-        self.global_traj_vis_pub.publish(wp_map_line_vis_msg(self.traj_line, self.get_clock().now().to_msg()))
+        # self.global_traj_vis_pub.publish(wp_map_line_vis_msg(self.traj_line, self.get_clock().now().to_msg()))
+        self.global_traj_vis_pub.publish(wp_map_line_with_vel_vis_msg(self.traj_line, self.vel_rl, self.get_clock().now().to_msg()))
 
     def odom_callback(self, odom_msg):
         # Convert Odom
