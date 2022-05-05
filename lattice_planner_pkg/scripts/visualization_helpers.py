@@ -4,7 +4,6 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
-
 def wp_vis_msg(xy, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.3,
                    dur=Duration(seconds=0.5).to_msg(), frame='map', log=False):
     """

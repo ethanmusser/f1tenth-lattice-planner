@@ -84,7 +84,8 @@ class LatticePlanner(Node):
         self.vel_rl = graph_ltpl.imp_global_traj.src.\
             import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[6]
         self.traj_line = get_traj_line(self.refline, self.norm_vec, self.alpha)
-
+        # print('traj line', self.traj_line)
+        
         # Set Start Position
         is_in_track = self.ltpl_obj.set_startpos(pos_est=self.pos,
                                                  heading_est=self.yaw)
@@ -110,6 +111,13 @@ class LatticePlanner(Node):
         # Publish Selected Trajectory
         self.publish_local_traj(self.traj_set[sel_action][0])
 
+        #Visualizing trajectory
+        self.chosen_local_line = np.array(self.traj_set[sel_action][0][:,1:3]).tolist()
+        # self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line))
+        # print('full array', np.array(self.traj_set[sel_action][0]))
+        # print('local line shape', np.array(self.traj_set[sel_action][0][:,1:3]).tolist())
+        # print('local line shape', self.chosen_local_line.shape)
+        self.local_traj_vis_timer = self.create_timer(0.25, self.vis_local_traj)
         # 
         # print(self.traj_set)
         # print('traj shape', self.traj_set[sel_action].shape)
@@ -137,7 +145,7 @@ class LatticePlanner(Node):
         self.traj_pub.publish(msg)
     
     def vis_local_traj(self):
-        pass
+        self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line, self.get_clock().now().to_msg()))
 
     def global_traj_vis_timer_callback(self):
         self.global_traj_vis_pub.publish(wp_map_line_vis_msg(self.traj_line, self.get_clock().now().to_msg()))
