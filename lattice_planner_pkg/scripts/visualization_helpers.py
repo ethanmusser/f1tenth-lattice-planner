@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import numpy as np
 from rclpy.duration import Duration
 from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
@@ -40,13 +41,12 @@ def wp_map_pt_vis_msg(path, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.1,
         marker.header.stamp = ts
         marker.header.frame_id = frame
         marker.id = idx
-        # marker.type = marker.SPHERE
-        marker.type = marker.LINE_STRIP
+        marker.type = marker.SPHERE
         marker.pose.position.x = ps[0]
         marker.pose.position.y = ps[1]
         marker.scale.x = scale
-        # marker.scale.y = scale
-        # marker.scale.z = scale
+        marker.scale.y = scale
+        marker.scale.z = scale
         marker.color.r = rgba[0]
         marker.color.g = rgba[1]
         marker.color.b = rgba[2]
@@ -91,6 +91,25 @@ def wp_map_line_vis_msg(path, ts, id=0, rgba=[255.0, 0.0, 0.0, 1.0], rgbas=None,
             color.b = rgba[2] / 255
             color.a = rgba[3]
         marker.colors.append(color)
+
+    return marker
+
+
+def wp_map_line_with_vel_vis_msg(path, vel, ts, id=0, rgba_min=[255.0, 0.0, 0.0, 1.0], 
+                                 rgba_max=[0.0, 255.0, 0.0, 1.0], vel_range = None, scale=0.1, 
+                                 dur=None, frame='map'):
+    """
+    """
+    if not vel_range:
+        vel_range = [np.min(vel), np.max(vel)]
+    rgbas = []
+    for idx, ps in enumerate(path):
+        r = np.interp(vel[idx], vel_range, [rgba_min[0], rgba_max[0]])
+        g = np.interp(vel[idx], vel_range, [rgba_min[1], rgba_max[1]])
+        b = np.interp(vel[idx], vel_range, [rgba_min[2], rgba_max[2]])
+        a = np.interp(vel[idx], vel_range, [rgba_min[3], rgba_max[3]])
+        rgbas.append([r, g, b, a])
+    marker = wp_map_line_vis_msg(path, ts, id=0, rgbas=rgbas, scale=scale, dur=dur, frame=frame)
 
     return marker
 
