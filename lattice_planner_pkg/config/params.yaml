@@ -14,7 +14,10 @@ lattice_planner_node:
 pure_pursuit_node:
   ros__parameters:
     sparse_waypoint_filename: 'traj_race_cl_skirkanich4'
-    odometry_topic: '/pf/pose/odom'
+    drive_topic: '/drive'
+    trajectory_topic: '/lattice_planner/local_traj'
+    odometry_topic: '/ego_racecar/odom'
+    waypoint_vis_topic: '/pure_pursuit/waypoint'
     lookahead_distance: 1.2
     lookahead_method: 'curvature'
     steering_angle_bound: 0.4

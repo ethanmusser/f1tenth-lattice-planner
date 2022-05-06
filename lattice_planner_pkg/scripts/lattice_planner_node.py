@@ -132,9 +132,12 @@ class LatticePlanner(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         for wp in traj:
             pt = JointTrajectoryPoint()
+            pt.positions.append(wp[0])
             pt.positions.append(wp[1])
             pt.positions.append(wp[2])
             pt.velocities.append(wp[5])
+            pt.accelerations.append(wp[6])
+            pt.effort.append(wp[4]) # use effort to store curvature
             msg.points.append(pt)
 
         # Send Trajectories to Controller

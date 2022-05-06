@@ -6,8 +6,9 @@ from rclpy.node import Node
 import numpy as np
 from scipy.interpolate import splprep, splev
 from ackermann_msgs.msg import AckermannDriveStamped
-from visualization_msgs.msg import Marker
 from nav_msgs.msg import Path, Odometry
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from visualization_msgs.msg import Marker
 from tf_transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix
 from ament_index_python.packages import get_package_share_directory
 import pathlib
@@ -24,6 +25,7 @@ class PurePursuit(Node):
         # Declare Parameters
         self.declare_parameter('sparse_waypoint_filename')
         self.declare_parameter('drive_topic')
+        self.declare_parameter('trajectory_topic')
         self.declare_parameter('odometry_topic')
         self.declare_parameter('waypoint_vis_topic')
         self.declare_parameter('lookahead_distance')
@@ -41,6 +43,7 @@ class PurePursuit(Node):
         # Class Variables
         self.sparse_waypoint_filename = self.get_parameter('sparse_waypoint_filename').value
         drive_topic = self.get_parameter('drive_topic').value
+        traj_topic = self.get_parameter('trajectory_topic').value
         odom_topic = self.get_parameter('odometry_topic').value
         wp_vis_topic = self.get_parameter('waypoint_vis_topic').value
         self.waypoint_distance = self.get_parameter('waypoint_distance').value
@@ -50,12 +53,14 @@ class PurePursuit(Node):
         self.lookahead_method = self.get_parameter('lookahead_method').value
 
         # Subscribers & Publishers
-        self.pf_sub = self.create_subscription(Odometry, odom_topic, self.pose_callback, 10)
-        self.drive_pub = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
-        self.wp_vis_pub = self.create_publisher(Marker, wp_vis_topic, 10)
+        self.traj_sub = self.create_subscription(JointTrajectory, traj_topic, self.traj_callback, 1)
+        self.odom_sub = self.create_subscription(Odometry, odom_topic, self.pose_callback, 1)
+        self.drive_pub = self.create_publisher(AckermannDriveStamped, drive_topic, 1)
+        self.wp_vis_pub = self.create_publisher(Marker, wp_vis_topic, 1)
 
         # Path
-        self.path, self.k_values, self.velocity = self.get_waypoint_path()
+        self.trajectory_up = False
+        # self.path, self.curv, self.vel = self.get_waypoint_path()
 
     def find_cur_idx(self, odom_msg):
         position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
@@ -66,16 +71,16 @@ class PurePursuit(Node):
     def compute_lookahead(self, cur_idx, method='curvature'):
         if method == 'velocity':
             # Velocity-Based Lookahead
-            min_vel = np.min(self.velocity)
-            max_vel = np.max(self.velocity)
-            lookahead = np.interp(self.velocity[cur_idx],
+            min_vel = np.min(self.vel)
+            max_vel = np.max(self.vel)
+            lookahead = np.interp(self.vel[cur_idx],
                                   np.array([min_vel, max_vel]),
                                   np.array([self.min_lookahead, self.max_lookahead]))
         elif method == 'curvature':
             # Curvature-Based Lookahead
-            min_curv = np.min(abs(self.k_values))
-            max_curv = np.max(abs(self.k_values))
-            lookahead = np.interp(self.k_values[cur_idx],
+            min_curv = np.min(abs(self.curv))
+            max_curv = np.max(abs(self.curv))
+            lookahead = np.interp(self.curv[cur_idx],
                                   np.array([min_curv, max_curv]),
                                   np.array([self.min_lookahead, self.max_lookahead]))
         else:
@@ -118,7 +123,6 @@ class PurePursuit(Node):
         xy = data[:, 1:3]
         curvature = data[:, 4]
         velocity = data[:, 5]
-        # data = 15 * np.random.rand(20, 3)
         return xy, curvature, velocity
 
     def path_to_array(self, path):
@@ -139,8 +143,6 @@ class PurePursuit(Node):
         Callback for path service.
         """
         # Spline Interpolate Sparse Path
-        # print("sparse_points = ")
-        # print(sparse_points)
         tck, u = splprep(sparse_points.transpose(), s=0, per=True)
         approx_length = np.sum(np.linalg.norm(
             np.diff(splev(np.linspace(0, 1, 100), tck), axis=0), axis=1))
@@ -183,17 +185,13 @@ class PurePursuit(Node):
         desired_angle = curvature * self.get_parameter('proportional_control').value
         return desired_angle
 
-    def publish_drive_msg(self, desired_angle, velocity):
+    def publish_drive_msg(self, desired_angle, speed):
         """
         """
         # Compute Control Input
         angle = np.clip(desired_angle,
                         -self.get_parameter('steering_angle_bound').value,
                         self.get_parameter('steering_angle_bound').value)
-        # speed = np.interp(abs(angle),
-        #                   np.array([0.0, self.get_parameter('steering_angle_bound').value, np.inf]),
-        #                   np.array([self.get_parameter('desired_speed').value, self.get_parameter('min_speed').value, self.get_parameter('min_speed').value]))
-        speed = velocity
         msg = AckermannDriveStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.drive.steering_angle = self.get_parameter('steering_angle_factor').value * angle
@@ -202,15 +200,34 @@ class PurePursuit(Node):
 
         return 0
 
-    def publish_waypoint_msg(self, x, y):
+    def publish_waypoint_vis_msg(self, x, y):
         """
         """
         msg = wp_vis_msg([x, y], self.get_clock().now().to_msg())
         self.wp_vis_pub.publish(msg)
+    
+    def traj_callback(self, traj_msg):
+        """
+        """
+        if not self.trajectory_up:
+            self.get_logger().info('Trajectory publisher available.')
+            self.trajectory_up = True
+        self.path = np.array([[pt.positions[1], pt.positions[2]] for pt in traj_msg.points])
+        # self.path = np.concatenate(([self.pos], self.path))
+        self.s = np.array([pt.positions[0] for pt in traj_msg.points])
+        self.vel = np.array([pt.velocities[0] for pt in traj_msg.points])
+        self.acc = np.array([pt.accelerations[0] for pt in traj_msg.points])
+        self.curv = np.array([pt.effort[0] for pt in traj_msg.points])
 
     def pose_callback(self, odom_msg):
         """
         """
+        # Save Odometry
+        self.pos = [odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y]
+        # Break if no trajectory
+        if not self.trajectory_up:
+            self.get_logger().info('No trajectory available.')
+            return None
         # Identify current index position on map
         cur_idx = self.find_cur_idx(odom_msg)
         # Obtain appropriate lookahead
@@ -222,8 +239,13 @@ class PurePursuit(Node):
         # Calculate curvature/steering angle
         desired_angle = self.compute_steering_angle(odom_msg, goal_y_body)
         # Publish drive message, don't forget to limit the steering angle.
-        self.publish_waypoint_msg(x_w, y_w)
-        self.publish_drive_msg(desired_angle, self.velocity[cur_idx])
+        print('xx shape(self.path) =', np.shape(self.path))
+        print('xx cur_idx =', cur_idx)
+        print('xx self.vel[cur_idx] =', self.vel[cur_idx])
+        print('xx len(self.vel) =', len(self.vel))
+        print('xx self.vel =', self.vel)
+        self.publish_drive_msg(desired_angle, self.vel[cur_idx])
+        self.publish_waypoint_vis_msg(x_w, y_w)
 
 
 def main(args=None):
