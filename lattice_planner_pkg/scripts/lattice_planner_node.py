@@ -94,8 +94,8 @@ class LatticePlanner(Node):
         if is_in_track:
             self.get_logger().info('Vehicle in track, LTPL initialized.')
             self.graph_ltpl_up = True
-        else: 
-            self.get_logger().info('Vehicle not at start position.')
+        else:
+            self.get_logger().info('Vehicle not in track.')
 
     def update_local_plan(self):
         # Select Trajectory from List
@@ -118,13 +118,9 @@ class LatticePlanner(Node):
         self.publish_local_traj(local_path)
 
         # Visualize Trajectory
-        # local_marker_msg = wp_map_line_vis_msg(local_path[:,1:3], self.get_clock().now().to_msg())
-        local_marker_msg = wp_map_line_vis_with_start_msg(self.pos[:3], local_path[:, 1:3],
-                                                          self.get_clock().now().to_msg(), 
-                                                          rgba=[0.0, 0.0, 255.0, 1.0])
+        local_marker_msg = wp_map_line_vis_msg(local_path[:,1:3], self.get_clock().now().to_msg(),
+                                               rgba=[0.0, 0.0, 255.0, 0.8])
         self.local_traj_vis_pub.publish(local_marker_msg)
-        # self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line))
-        # self.publish_waypoint_map_msg(np.array([self.traj_set[sel_action][0][0][1:3]]))
 
         # Log & Visualize (if enabled)
         self.ltpl_obj.log()

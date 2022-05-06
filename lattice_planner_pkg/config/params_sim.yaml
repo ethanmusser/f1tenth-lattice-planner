@@ -9,7 +9,7 @@ lattice_planner_node:
     local_traj_vis_topic: '/lattice_planner/local_traj_vis_topic'
     visual_mode: False
     log_mode: False
-    yaw_offset: 0.7853 #-1.5708 #3.1415
+    yaw_offset: 3.1415
 
 pure_pursuit_node:
   ros__parameters:
