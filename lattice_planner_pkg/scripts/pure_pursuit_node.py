@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from visualization_helpers import wp_vis_msg
 import rclpy
 from rclpy.node import Node
 
@@ -27,6 +28,10 @@ class PurePursuit(Node):
         super().__init__('pure_pursuit_node')
 
         # Declare Parameters
+        self.declare_parameter('sparse_waypoint_filename')
+        self.declare_parameter('drive_topic')
+        self.declare_parameter('odometry_topic')
+        self.declare_parameter('waypoint_vis_topic')
         self.declare_parameter('lookahead_distance')
         self.declare_parameter('steering_angle_bound')
         self.declare_parameter('desired_speed')
@@ -34,38 +39,28 @@ class PurePursuit(Node):
         self.declare_parameter('proportional_control')
         self.declare_parameter('steering_angle_factor')
         self.declare_parameter('speed_factor')
-        self.declare_parameter('sparse_waypoint_filename')
-        self.declare_parameter('odometry_topic')
         self.declare_parameter('waypoint_distance')
         self.declare_parameter('min_lookahead')
         self.declare_parameter('max_lookahead')
 
         # Class Variables
         self.sparse_waypoint_filename = self.get_parameter('sparse_waypoint_filename').value
-        odometry_topic = self.get_parameter('odometry_topic').value
+        drive_topic = self.get_parameter('drive_topic').value
+        odom_topic = self.get_parameter('odometry_topic').value
+        wp_vis_topic = self.get_parameter('waypoint_vis_topic').value
         self.waypoint_distance = self.get_parameter('waypoint_distance').value
         self.min_lookahead = self.get_parameter('min_lookahead').value
         self.max_lookahead = self.get_parameter('max_lookahead').value
         self.lookahead_distance = self.get_parameter('lookahead_distance').value
 
-        # Topics
-        lidarscan_topic = '/scan'
-        drive_topic = '/drive'
-        waypoint_topic = '/pure_pursuit/waypoint'
-        waypointmap_topic = '/pure_pursuit/waypoint_map'
-
         # Subscribers & Publishers
         self.particle_filterSubscription = self.create_subscription(
-            Odometry, odometry_topic, self.pose_callback, 10)
+            Odometry, odom_topic, self.pose_callback, 10)
         self.AckPublisher = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
-        self.WaypointVisualizer = self.create_publisher(Marker, waypoint_topic, 10)
-        self.WaypointMapvisualizer = self.create_publisher(MarkerArray, waypointmap_topic, 10)
+        self.WaypointVisualizer = self.create_publisher(Marker, wp_vis_topic, 10)
 
-        # Client
-        # self.path = self.generate_waypoint_path(self.get_waypoint_path(), self.waypoint_distance)
-        
+        # Path
         self.path, self.k_values, self.velocity = self.get_waypoint_path()
-        self.timer = self.create_timer(1.0, self.publish_waypoint_map_msg)
     
     def find_cur_idx(self, odom_msg):
         position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
@@ -232,39 +227,6 @@ class PurePursuit(Node):
         marker.color.a = 1.0
         marker.lifetime = rclpy.duration.Duration(seconds=0.5).to_msg()
         self.WaypointVisualizer.publish(marker)
-
-    def publish_waypoint_map_msg(self):
-        """
-        """
-        marker_array = MarkerArray()
-        for idx, ps in enumerate(self.path):
-            marker = Marker()
-            marker.header.stamp = self.get_clock().now().to_msg()
-            marker.header.frame_id = 'map'
-            marker.id = idx
-            marker.type = marker.SPHERE
-            marker.pose.position.x = ps[0]
-            marker.pose.position.y = ps[1]
-            marker.scale.x = 0.1
-            marker.scale.y = 0.1
-            marker.scale.z = 0.1
-            marker.color.r = np.interp(self.velocity[idx], 
-                    np.array([0.0, np.max(self.velocity)]),
-                    np.array([255.0, 0.0]))
-            marker.color.g = np.interp(self.velocity[idx], 
-                    np.array([0.0, np.max(self.velocity)]),
-                    np.array([0.0, 255.0]))
-            marker.color.b = 0.0
-            marker.color.a = 1.0
-            pt = Point()
-            pt.x = marker.pose.position.x
-            pt.y = marker.pose.position.y
-            marker.points.append(pt)
-            # marker.lifetime = rclpy.duration.Duration(seconds=0.5)
-            marker_array.markers.append(marker)
-
-        self.WaypointMapvisualizer.publish(marker_array)
-
 
     def pose_callback(self, odom_msg):
         """
