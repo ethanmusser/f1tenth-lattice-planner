@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
-from visualization_helpers import wp_vis_msg
+from visualization_helpers import *
 import rclpy
 from rclpy.node import Node
 
 import numpy as np
-import math
 from scipy.interpolate import splprep, splev
-from sensor_msgs.msg import LaserScan
-from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
-from visualization_msgs.msg import MarkerArray, Marker
+from ackermann_msgs.msg import AckermannDriveStamped
+from visualization_msgs.msg import Marker
 from nav_msgs.msg import Path, Odometry
-from geometry_msgs.msg import PoseStamped, Point
-from scipy.interpolate import interp1d
-import sys
-import csv
 from tf_transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix
 from ament_index_python.packages import get_package_share_directory
 import pathlib
@@ -62,7 +56,7 @@ class PurePursuit(Node):
 
         # Path
         self.path, self.k_values, self.velocity = self.get_waypoint_path()
-    
+
     def find_cur_idx(self, odom_msg):
         position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
         point_dist = np.linalg.norm(self.path[:, 0:2] - position, axis=1)
@@ -75,15 +69,15 @@ class PurePursuit(Node):
             min_vel = np.min(self.velocity)
             max_vel = np.max(self.velocity)
             lookahead = np.interp(self.velocity[cur_idx],
-                        np.array([min_vel, max_vel]),
-                        np.array([self.min_lookahead, self.max_lookahead]))
+                                  np.array([min_vel, max_vel]),
+                                  np.array([self.min_lookahead, self.max_lookahead]))
         elif method == 'curvature':
             # Curvature-Based Lookahead
             min_curv = np.min(abs(self.k_values))
             max_curv = np.max(abs(self.k_values))
             lookahead = np.interp(self.k_values[cur_idx],
-                        np.array([min_curv, max_curv]),
-                        np.array([self.min_lookahead, self.max_lookahead]))
+                                  np.array([min_curv, max_curv]),
+                                  np.array([self.min_lookahead, self.max_lookahead]))
         else:
             # Constant Lookahead
             lookahead = self.lookahead_distance
@@ -99,11 +93,11 @@ class PurePursuit(Node):
                 continue
             elif dis_diff > 0:
                 x_w = np.interp(lookahead,
-                    np.array([point_dist[cur_idx - 1], point_dist[cur_idx]]),
-                    np.array([self.path[cur_idx - 1, 0], self.path[cur_idx, 0]]))
+                                np.array([point_dist[cur_idx - 1], point_dist[cur_idx]]),
+                                np.array([self.path[cur_idx - 1, 0], self.path[cur_idx, 0]]))
                 y_w = np.interp(lookahead,
-                    np.array([point_dist[cur_idx - 1], point_dist[cur_idx]]),
-                    np.array([self.path[cur_idx - 1, 1], self.path[cur_idx, 1]]))
+                                np.array([point_dist[cur_idx - 1], point_dist[cur_idx]]),
+                                np.array([self.path[cur_idx - 1, 1], self.path[cur_idx, 1]]))
                 break
             else:
                 x_w = self.path[cur_idx, 0]
@@ -121,26 +115,23 @@ class PurePursuit(Node):
         if not pathlib.Path(filepath).is_file():
             pathlib.Path(filepath).touch()
         data = np.genfromtxt(filepath, delimiter=';', )
-        # print('filepath:', filepath)
-        # x = data[:,0] + data[:,4]*data[:,6]
-        # y = data[:,1] + data[:,5]*data[:,6]
-        # xy = np.array([x,y]).transpose()
-        xy = data[:,1:3]
-        curvature = data[:,4]
-        velocity = data[:,5]
+        xy = data[:, 1:3]
+        curvature = data[:, 4]
+        velocity = data[:, 5]
         # data = 15 * np.random.rand(20, 3)
         return xy, curvature, velocity
-        
+
     def path_to_array(self, path):
         """
         """
         # Unpack Path into Array of [x, y, yaw]
         arr = []
         for ps in path.poses:
-            quat = [ps.pose.orientation.x, ps.pose.orientation.y, ps.pose.orientation.z, ps.pose.orientation.w]
+            quat = [ps.pose.orientation.x, ps.pose.orientation.y,
+                    ps.pose.orientation.z, ps.pose.orientation.w]
             _, _, yaw = euler_from_quaternion(quat)
             arr.append([ps.pose.position.x, ps.pose.position.y, yaw])
-        
+
         return arr
 
     def generate_waypoint_path(self, sparse_points, waypoint_distance, skip_header=3):
@@ -187,7 +178,7 @@ class PurePursuit(Node):
         """
         Curvature calculation
         """
-        y = y_goal_b 
+        y = y_goal_b
         curvature = (2 * y) / self.lookahead_distance ** 2
         desired_angle = curvature * self.get_parameter('proportional_control').value
         return desired_angle
@@ -214,37 +205,23 @@ class PurePursuit(Node):
     def publish_waypoint_msg(self, x, y):
         """
         """
-        marker = Marker()
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.header.frame_id = 'map'
-        marker.type = marker.SPHERE
-        marker.pose.position.x = x
-        marker.pose.position.y = y
-        marker.scale.x = 0.2
-        marker.scale.y = 0.2
-        marker.scale.z = 0.2
-        marker.color.r = 255.0
-        marker.color.g = 0.0
-        marker.color.b = 0.0
-        marker.color.a = 1.0
-        marker.lifetime = rclpy.duration.Duration(seconds=0.5).to_msg()
-        self.wp_vis_pub.publish(marker)
+        msg = wp_vis_msg([x, y], self.get_clock().now().to_msg())
+        self.wp_vis_pub.publish(msg)
 
     def pose_callback(self, odom_msg):
         """
         """
-        #identify current index position on map
+        # Identify current index position on map
         cur_idx = self.find_cur_idx(odom_msg)
-        # print('cur_vel:', self.velocity[cur_idx])
-        #obtain appropriate lookahead
+        # Obtain appropriate lookahead
         lookahead = self.compute_lookahead(cur_idx, self.lookahead_method)
-        #get waypoint to follow based on new lookahead
+        # get waypoint to follow based on new lookahead
         x_w, y_w = self.get_cur_waypoint(cur_idx, odom_msg, lookahead)
-        # TODO: transform goal point to vehicle frame of reference
+        # Transform goal point to vehicle frame of reference
         goal_x_body, goal_y_body = self.transform_point(odom_msg, x_w, y_w)
-        # TODO: calculate curvature/steering angle
+        # Calculate curvature/steering angle
         desired_angle = self.compute_steering_angle(odom_msg, goal_y_body)
-        # TODO: publish drive message, don't forget to limit the steering angle.
+        # Publish drive message, don't forget to limit the steering angle.
         self.publish_waypoint_msg(x_w, y_w)
         self.publish_drive_msg(desired_angle, self.velocity[cur_idx])
 
