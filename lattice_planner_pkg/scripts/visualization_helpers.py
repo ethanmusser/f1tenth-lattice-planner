@@ -94,6 +94,16 @@ def wp_map_line_vis_msg(path, ts, ident=0, rgba=[255.0, 0.0, 0.0, 1.0], rgbas=No
     return marker
 
 
+def wp_map_line_vis_with_start_msg(start, path, ts, ident=0, rgba=[255.0, 0.0, 0.0, 1.0], 
+                                   rgbas=None, scale=0.1, dur=None, frame='map'):
+    """
+    """
+    path = np.concatenate(([start], path))
+    return wp_map_line_vis_msg(path, ts, ident=ident, rgba=rgba, rgbas=rgbas, scale=scale, 
+                       dur=dur, frame=frame)
+
+
+
 def wp_map_line_with_vel_vis_msg(path, vel, ts, ident=0, rgba_min=[255.0, 0.0, 0.0, 1.0], 
                                  rgba_mid=[255.0, 255.0, 0.0, 1.0], rgba_max=[0.0, 255.0, 0.0, 1.0], 
                                  vel_range=None, scale=0.1, dur=None, frame='map', wrap=False):
@@ -104,8 +114,8 @@ def wp_map_line_with_vel_vis_msg(path, vel, ts, ident=0, rgba_min=[255.0, 0.0, 0
         vmax = np.max(vel)
         vel_range = [vmin, np.mean([vmin, vmax]), vmax]
     if wrap:
-        np.concatenate((path, [path[0]]))
-        np.concatenate((vel, [vel[0]]))
+        path = np.concatenate((path, [path[0]]))
+        vel = np.concatenate((vel, [vel[0]]))
     rgbas = []
     for idx, ps in enumerate(path):
         r = np.interp(vel[idx], vel_range, [rgba_min[0] / 255, rgba_mid[0] / 255, rgba_max[0] / 255])
@@ -113,6 +123,6 @@ def wp_map_line_with_vel_vis_msg(path, vel, ts, ident=0, rgba_min=[255.0, 0.0, 0
         b = np.interp(vel[idx], vel_range, [rgba_min[2] / 255, rgba_mid[2] / 255, rgba_max[2] / 255])
         a = np.interp(vel[idx], vel_range, [rgba_min[3], rgba_mid[3], rgba_max[3]])
         rgbas.append([r, g, b, a])
-    marker = wp_map_line_vis_msg(path, ts, ident=0, rgbas=rgbas, scale=scale, dur=dur, frame=frame)
+    marker = wp_map_line_vis_msg(path, ts, ident=ident, rgbas=rgbas, scale=scale, dur=dur, frame=frame)
     return marker
 

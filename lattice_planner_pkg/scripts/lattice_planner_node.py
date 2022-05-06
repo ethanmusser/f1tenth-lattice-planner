@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from visualization_helpers import wp_vis_msg, wp_map_pt_vis_msg, wp_map_line_vis_msg, wp_map_line_with_vel_vis_msg
+from visualization_helpers import *
 from nav_msgs.msg import Odometry
 from graph_ltpl_helpers import get_path_dict, get_traj_line
 import graph_ltpl
@@ -33,6 +33,7 @@ class LatticePlanner(Node):
         self.declare_parameter('local_traj_vis_topic')
         self.declare_parameter('visual_mode')
         self.declare_parameter('log_mode')
+        self.declare_parameter('yaw_offset')
 
         # Read Parameters
         self.toppath = self.get_parameter('toppath').value
@@ -44,6 +45,7 @@ class LatticePlanner(Node):
         local_traj_vis_topic = self.get_parameter('local_traj_vis_topic').value
         self.visual_mode = self.get_parameter('visual_mode').value
         self.log_mode = self.get_parameter('log_mode').value
+        self.yaw_offset = self.get_parameter('yaw_offset').value
 
         # Class Members
         self.pos = None
@@ -85,15 +87,15 @@ class LatticePlanner(Node):
         self.vel_rl = graph_ltpl.imp_global_traj.src.\
             import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[6]
         self.traj_line = get_traj_line(self.refline, self.norm_vec, self.alpha)
-        
+
         # Set Start Position
         is_in_track = self.ltpl_obj.set_startpos(pos_est=self.pos,
-                                                 heading_est=self.yaw)
+                                                 heading_est=self.yaw + self.yaw_offset)
         if is_in_track:
             self.get_logger().info('Vehicle in track, LTPL initialized.')
             self.graph_ltpl_up = True
-        self.get_logger().info('Vehicle not in track.')
-        # self.graph_ltpl_up = True
+        else: 
+            self.get_logger().info('Vehicle not at start position.')
 
     def update_local_plan(self):
         # Select Trajectory from List
@@ -110,13 +112,16 @@ class LatticePlanner(Node):
         # Compute Velocity Profile & Retrieve Tajectories
         self.traj_set = self.ltpl_obj.calc_vel_profile(pos_est=self.pos,
                                                        vel_est=self.vel)[0]
-        
+
         # Publish Selected Trajectory
         local_path = np.array(self.traj_set[sel_action][0])
         self.publish_local_traj(local_path)
 
         # Visualize Trajectory
-        local_marker_msg = wp_map_line_vis_msg(local_path[:,1:3].tolist(), self.get_clock().now().to_msg())
+        # local_marker_msg = wp_map_line_vis_msg(local_path[:,1:3], self.get_clock().now().to_msg())
+        local_marker_msg = wp_map_line_vis_with_start_msg(self.pos[:3], local_path[:, 1:3],
+                                                          self.get_clock().now().to_msg(), 
+                                                          rgba=[0.0, 0.0, 255.0, 1.0])
         self.local_traj_vis_pub.publish(local_marker_msg)
         # self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line))
         # self.publish_waypoint_map_msg(np.array([self.traj_set[sel_action][0][0][1:3]]))
@@ -124,7 +129,7 @@ class LatticePlanner(Node):
         # Log & Visualize (if enabled)
         self.ltpl_obj.log()
         self.ltpl_obj.visual()
-    
+
     def publish_local_traj(self, traj):
         # Write Local Trajectory to ROS Message
         msg = JointTrajectory()
@@ -139,12 +144,13 @@ class LatticePlanner(Node):
         # Send Trajectories to Controller
         # select a trajectory from the set and send it to the controller here
         self.traj_pub.publish(msg)
-    
+
     # def vis_local_traj(self):
     #     self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line, self.get_clock().now().to_msg()))
 
     def global_traj_vis_timer_callback(self):
-        global_traj_marker_msg = wp_map_line_with_vel_vis_msg(self.traj_line, self.vel_rl, self.get_clock().now().to_msg(), wrap=True)
+        global_traj_marker_msg = wp_map_line_with_vel_vis_msg(
+            self.traj_line, self.vel_rl, self.get_clock().now().to_msg(), wrap=True, scale=0.05)
         self.global_traj_vis_pub.publish(global_traj_marker_msg)
 
     def odom_callback(self, odom_msg):
@@ -156,11 +162,11 @@ class LatticePlanner(Node):
         quat = [pose.orientation.x, pose.orientation.y,
                 pose.orientation.z, pose.orientation.w]
         _, _, self.yaw = euler_from_quaternion(quat)
-        
+
         # First-Time Graph-LTPL Setup
         if not self.graph_ltpl_up:
             self.initialize_graph_ltpl()
-        
+
         # Run Local Planner & Publish Commands
         self.update_local_plan()
 
