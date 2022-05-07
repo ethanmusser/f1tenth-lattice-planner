@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from visualization_helpers import *
+from opp_pose_estimation import *
 import rclpy
 from rclpy.node import Node
 import numpy as np
@@ -30,11 +31,13 @@ class ObjectDetect(Node):
         self.declare_parameter('obstacle_vis_topic')
         self.declare_parameter('disparitiy_vis_topic')
         self.declare_parameter('gap_threshold')
+        self.declare_parameter('lambda')
 
         # Class Variables
         self.lidar_max_dist = self.get_parameter('lidar_proc_max_dist').value
         self.disparity_threshold = self.get_parameter('disparity_threshold').value
         self.gap_threshold = self.get_parameter('gap_threshold').value
+        self.lamb = self.get_parameter('lambda').value
 
         #topics
         odom_topic = self.get_parameter('odometry_topic').value
@@ -122,14 +125,18 @@ class ObjectDetect(Node):
         
     def lidar_callback(self, scan_msg):
         proc_ranges = self.preprocess_lidar(scan_msg.ranges, scan_msg.angle_increment, scan_msg.range_min)
-        self.disparities, self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
-        # disparity_loc = 
+        b, p = adaptive_breakpoint_detection(proc_ranges, self.lamb, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
+        #uncomment below code for disparity approach
+        # self.disparities, self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
+        
     
     def odom_callback(self, odom_msg):
-        disparities_world = self.disparities_xy(odom_msg, self.car_x, self.car_y)
+        #uncomment below code for disparity approach
+        # disparities_world = self.disparities_xy(odom_msg, self.car_x, self.car_y)
         #visualize disparities
-        if len(disparities_world) > 0:
-            self.publish_disparities_vis(disparities_world)
+        # if len(disparities_world) > 0:
+        #     self.publish_disparities_vis(disparities_world)
+        pass
 
     def transform_car_to_global(self, odom_msg, goal_x, goal_y):
         quaternion = [odom_msg.pose.pose.orientation.x,

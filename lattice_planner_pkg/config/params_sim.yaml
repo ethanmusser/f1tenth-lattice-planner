@@ -42,6 +42,7 @@ object_detect_node:
     lidar_proc_max_dist: 4.0
     disparity_threshold: 0.2
     gap_threshold: 1.5
+    lambda: 0.35
 
 waypoint_logger_service:
   ros__parameters:
