@@ -60,6 +60,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/lattice_planner_node.py
   scripts/pure_pursuit_node.py
+  scripts/opp_pose_estimation.py
   scripts/waypoint_logger_service.py
   scripts/laser_scan_helpers.py
   scripts/graph_ltpl_helpers.py

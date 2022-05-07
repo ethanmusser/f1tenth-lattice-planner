@@ -1,29 +1,42 @@
 #!/usr/bin/env python3
+from math import sin, cos, radians
 import numpy as np
 
 
-def get_range_at_angle(range_data, angle, angle_min=-0.75*np.pi, angle_max=0.75*np.pi, angle_inc=0.05):
+def get_range_at_a(ranges, a, amin=radians(-135), amax=radians(135), ainc=radians(0.25)):
     """
-    Simple helper to return the corresponding range measurement at a given angle.
-    Args:
-        range_data: single range array from the LiDAR
-        angle: between angle_min and angle_max of the LiDAR
-    Returns:
-        range: range measurement in meters at the given angle
+    Finds the corresponding range measurement at a given a.
+
+    :param ranges: single range array from the LiDAR
+    :param a: angle between amin and amax of the LiDAR
+    :return: range measurement in meters at the given a
     """
     # Validate Input
-    assert angle_min <= angle_max, f'Min. angle {angle_min} rad must be less than max. angle {angle_max} rad.'
+    assert amin <= a <= amax, f'Angles must satisy amin <= a <= amax.'
 
     # Condition Input Parameters
-    angle = np.clip(angle, angle_min, angle_max)
-    range_data = np.array(range_data)
+    a = np.clip(a, amin, amax)
+    ranges = np.array(ranges)
 
     # Linearly Interpolate Invalid Range Datapoints
-    mask = np.logical_or(np.isnan(range_data), np.isinf(range_data))
-    range_data[mask] = np.interp(np.flatnonzero(mask),
-                                 np.flatnonzero(np.logical_not(mask)),
-                                 range_data[np.logical_not(mask)])
+    mask = np.logical_or(np.isnan(ranges), np.isinf(ranges))
+    ranges[mask] = np.interp(np.flatnonzero(mask),
+                             np.flatnonzero(np.logical_not(mask)),
+                             ranges[np.logical_not(mask)])
 
-    # Return Range at the Provided Angle
-    idx = int(round((angle - angle_min) / angle_inc))
-    return range_data[idx]
+    # Return Range at the Provided a
+    idx = int(round((a - amin) / ainc))
+    return ranges[idx]
+
+
+def get_point_at_angle(ranges, a, amin=radians(-135), amax=radians(135), ainc=radians(0.25)):
+    """
+    Finds the corresponding (x, y) coordinates of the point at a specified angle in range data.
+
+    :param ranges: range array from LiDAR data
+    :param a: valid angle in LiDAR data in radians
+    :return: (x, y) coordinate of point
+    """
+    r = get_range_at_a(ranges, a, amin, amax, ainc)
+    return (r * cos(a), r * sin(a))
+    
