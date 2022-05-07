@@ -148,6 +148,10 @@ class LatticePlanner(Node):
         return msg
 
     def publish_global_traj(self):
+        # Break if Trajectory Not Available
+        if not self.graph_ltpl_up:
+            return None
+        
         # Publish
         if self.is_publish_global_traj:
             global_traj = np.concatenate((np.zeros((len(self.traj_line), 1)), self.traj_line, 
