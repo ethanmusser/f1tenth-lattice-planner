@@ -65,8 +65,6 @@ class PurePursuit(Node):
 
         # Path
         self.trajectory_up = False
-        self.first_follow_path = True
-        # self.path, self.curv, self.vel = self.get_waypoint_path()
 
     def find_cur_idx(self, odom_msg):
         position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
@@ -215,36 +213,15 @@ class PurePursuit(Node):
     def traj_callback(self, traj_msg):
         """
         """
-        print('traj_callback')
         if not self.trajectory_up:
             self.get_logger().info('Trajectory publisher available.')
             self.trajectory_up = True
-        self.local_path = np.array([[pt.positions[1], pt.positions[2]] for pt in traj_msg.points])
+        self.path = np.array([[pt.positions[1], pt.positions[2]] for pt in traj_msg.points])
         # self.path = np.concatenate(([self.pos], self.path))
         self.s = np.array([pt.positions[0] for pt in traj_msg.points])
         self.vel = np.array([pt.velocities[0] for pt in traj_msg.points])
         self.acc = np.array([pt.accelerations[0] for pt in traj_msg.points])
-        self.curv = np.array([pt.effort[0] for pt in traj_msg.points])
-
-        #updating path
-        #if it is the first run, initialize follow_path with the first local path
-        if self.first_follow_path:
-            self.follow_path = self.local_path
-            self.follow_s = self.s
-            self.first_follow_path = False
-        #find the index within follow_path which is closest to the first local path entry 
-        # follow_path_update_idx = np.argmin(self.follow_s < self.s)
-        follow_path_update_idx = np.argmin(abs(self.follow_s - self.s[0]))
-        #follow_path is updated with the new local trajectory
-        self.follow_path = self.follow_path[0:follow_path_update_idx]
-        self.follow_s = self.s[0:follow_path_update_idx]
-        #append the local path into follow path
-        self.follow_path = np.append(self.follow_path, self.local_path, axis = 0)
-        self.follow_s = np.append(self.follow_s, self.s)
-        # print('path_shape', self.follow_s)
-        self.path = self.follow_path
-        
-
+        self.curv = np.array([pt.effort[0] for pt in traj_msg.points])        
 
     def pose_callback(self, odom_msg):
         """
@@ -253,7 +230,7 @@ class PurePursuit(Node):
         self.pos = [odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y]
         # Break if no trajectory
         if not self.trajectory_up:
-            self.get_logger().info('No trajectory available.')
+            self.get_logger().debug('No trajectory available.')
             return None
         # Identify current index position on map
         cur_idx = self.find_cur_idx(odom_msg)
@@ -266,11 +243,6 @@ class PurePursuit(Node):
         # Calculate curvature/steering angle
         desired_angle = self.compute_steering_angle(odom_msg, goal_y_body, lookahead)
         # Publish drive message, don't forget to limit the steering angle.
-        # print('xx shape(self.path) =', np.shape(self.path))
-        # print('xx cur_idx =', cur_idx)
-        print('xx self.vel[cur_idx] =', self.vel[cur_idx])
-        # print('xx len(self.vel) =', len(self.vel))
-        # print('xx self.vel =', self.vel)
         self.publish_drive_msg(desired_angle, self.vel[cur_idx])
         self.publish_waypoint_vis_msg(x_w, y_w)
 
