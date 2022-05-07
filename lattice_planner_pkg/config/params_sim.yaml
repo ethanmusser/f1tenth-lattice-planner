@@ -33,6 +33,16 @@ pure_pursuit_node:
     min_lookahead: 1.2 # 1.6
     max_lookahead: 1.6 # 1.6
 
+object_detect_node:
+  ros__parameters:
+    odometry_topic: '/ego_racecar/odom'
+    laserscan_topic: '/scan'
+    obstacle_vis_topic: '/obstacle_detect/obstacle_vis_topic'
+    disparitiy_vis_topic: '/obstacle_detect/disparity_vis_topic'
+    lidar_proc_max_dist: 4.0
+    disparity_threshold: 0.2
+    gap_threshold: 1.5
+
 waypoint_logger_service:
   ros__parameters:
     odometry_topic: '/ego_racecar/odom'

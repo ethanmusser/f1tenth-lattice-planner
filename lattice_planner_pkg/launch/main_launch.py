@@ -29,6 +29,14 @@ def generate_launch_description():
             output="screen",
             emulate_tty=True,
             parameters=[config]
+        ),
+        Node(
+            package="lattice_planner_pkg",
+            executable="object_detect_node.py",
+            name="object_detect_node",
+            output="screen",
+            emulate_tty=True,
+            parameters=[config]
         )
     ])
 
