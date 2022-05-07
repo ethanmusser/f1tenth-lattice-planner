@@ -26,10 +26,11 @@ class PurePursuit(Node):
         self.declare_parameter('sparse_waypoint_filename')
         self.declare_parameter('drive_topic')
         self.declare_parameter('trajectory_topic')
+        self.declare_parameter('global_trajectory_topic')
         self.declare_parameter('odometry_topic')
         self.declare_parameter('waypoint_vis_topic')
-        self.declare_parameter('lookahead_distance')
         self.declare_parameter('lookahead_method')
+        self.declare_parameter('use_global_traj')
         self.declare_parameter('steering_angle_bound')
         self.declare_parameter('desired_speed')
         self.declare_parameter('min_speed')
@@ -44,22 +45,27 @@ class PurePursuit(Node):
         self.sparse_waypoint_filename = self.get_parameter('sparse_waypoint_filename').value
         drive_topic = self.get_parameter('drive_topic').value
         traj_topic = self.get_parameter('trajectory_topic').value
+        global_traj_topic = self.get_parameter('global_trajectory_topic').value
         odom_topic = self.get_parameter('odometry_topic').value
         wp_vis_topic = self.get_parameter('waypoint_vis_topic').value
         self.waypoint_distance = self.get_parameter('waypoint_distance').value
         self.min_lookahead = self.get_parameter('min_lookahead').value
         self.max_lookahead = self.get_parameter('max_lookahead').value
-        self.lookahead_distance = self.get_parameter('lookahead_distance').value
         self.lookahead_method = self.get_parameter('lookahead_method').value
+        use_global_traj = self.get_parameter('use_global_traj').value
 
         # Subscribers & Publishers
-        self.traj_sub = self.create_subscription(JointTrajectory, traj_topic, self.traj_callback, 1)
+        if use_global_traj:
+            self.traj_sub = self.create_subscription(JointTrajectory, global_traj_topic, self.traj_callback, 1)
+        else:
+            self.traj_sub = self.create_subscription(JointTrajectory, traj_topic, self.traj_callback, 1)
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.pose_callback, 1)
         self.drive_pub = self.create_publisher(AckermannDriveStamped, drive_topic, 1)
         self.wp_vis_pub = self.create_publisher(Marker, wp_vis_topic, 1)
 
         # Path
         self.trajectory_up = False
+        self.first_follow_path = True
         # self.path, self.curv, self.vel = self.get_waypoint_path()
 
     def find_cur_idx(self, odom_msg):
@@ -85,7 +91,7 @@ class PurePursuit(Node):
                                   np.array([self.min_lookahead, self.max_lookahead]))
         else:
             # Constant Lookahead
-            lookahead = self.lookahead_distance
+            lookahead = self.min_lookahead
         return lookahead
 
     def get_cur_waypoint(self, cur_idx, odom_msg, lookahead):
@@ -176,12 +182,12 @@ class PurePursuit(Node):
 
         return goal_b[0], goal_b[1]
 
-    def compute_steering_angle(self, odom_msg, y_goal_b):
+    def compute_steering_angle(self, odom_msg, y_goal_b, lookahead):
         """
         Curvature calculation
         """
         y = y_goal_b
-        curvature = (2 * y) / self.lookahead_distance ** 2
+        curvature = (2 * y) / lookahead ** 2
         desired_angle = curvature * self.get_parameter('proportional_control').value
         return desired_angle
 
@@ -209,15 +215,36 @@ class PurePursuit(Node):
     def traj_callback(self, traj_msg):
         """
         """
+        print('traj_callback')
         if not self.trajectory_up:
             self.get_logger().info('Trajectory publisher available.')
             self.trajectory_up = True
-        self.path = np.array([[pt.positions[1], pt.positions[2]] for pt in traj_msg.points])
+        self.local_path = np.array([[pt.positions[1], pt.positions[2]] for pt in traj_msg.points])
         # self.path = np.concatenate(([self.pos], self.path))
         self.s = np.array([pt.positions[0] for pt in traj_msg.points])
         self.vel = np.array([pt.velocities[0] for pt in traj_msg.points])
         self.acc = np.array([pt.accelerations[0] for pt in traj_msg.points])
         self.curv = np.array([pt.effort[0] for pt in traj_msg.points])
+
+        #updating path
+        #if it is the first run, initialize follow_path with the first local path
+        if self.first_follow_path:
+            self.follow_path = self.local_path
+            self.follow_s = self.s
+            self.first_follow_path = False
+        #find the index within follow_path which is closest to the first local path entry 
+        # follow_path_update_idx = np.argmin(self.follow_s < self.s)
+        follow_path_update_idx = np.argmin(abs(self.follow_s - self.s[0]))
+        #follow_path is updated with the new local trajectory
+        self.follow_path = self.follow_path[0:follow_path_update_idx]
+        self.follow_s = self.s[0:follow_path_update_idx]
+        #append the local path into follow path
+        self.follow_path = np.append(self.follow_path, self.local_path, axis = 0)
+        self.follow_s = np.append(self.follow_s, self.s)
+        # print('path_shape', self.follow_s)
+        self.path = self.follow_path
+        
+
 
     def pose_callback(self, odom_msg):
         """
@@ -237,13 +264,13 @@ class PurePursuit(Node):
         # Transform goal point to vehicle frame of reference
         goal_x_body, goal_y_body = self.transform_point(odom_msg, x_w, y_w)
         # Calculate curvature/steering angle
-        desired_angle = self.compute_steering_angle(odom_msg, goal_y_body)
+        desired_angle = self.compute_steering_angle(odom_msg, goal_y_body, lookahead)
         # Publish drive message, don't forget to limit the steering angle.
-        print('xx shape(self.path) =', np.shape(self.path))
-        print('xx cur_idx =', cur_idx)
+        # print('xx shape(self.path) =', np.shape(self.path))
+        # print('xx cur_idx =', cur_idx)
         print('xx self.vel[cur_idx] =', self.vel[cur_idx])
-        print('xx len(self.vel) =', len(self.vel))
-        print('xx self.vel =', self.vel)
+        # print('xx len(self.vel) =', len(self.vel))
+        # print('xx self.vel =', self.vel)
         self.publish_drive_msg(desired_angle, self.vel[cur_idx])
         self.publish_waypoint_vis_msg(x_w, y_w)
 

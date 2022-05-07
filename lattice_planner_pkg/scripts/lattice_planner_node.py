@@ -29,10 +29,12 @@ class LatticePlanner(Node):
         self.declare_parameter('track_specifier')
         self.declare_parameter('odometry_topic')
         self.declare_parameter('trajectory_topic')
+        self.declare_parameter('global_trajectory_topic')
         self.declare_parameter('global_traj_vis_topic')
         self.declare_parameter('local_traj_vis_topic')
         self.declare_parameter('visual_mode')
         self.declare_parameter('log_mode')
+        self.declare_parameter('publish_global_traj')
         self.declare_parameter('yaw_offset')
 
         # Read Parameters
@@ -41,10 +43,12 @@ class LatticePlanner(Node):
         self.mappath = self.get_parameter('mappath').value
         odom_topic = self.get_parameter('odometry_topic').value
         traj_topic = self.get_parameter('trajectory_topic').value
+        global_traj_topic = self.get_parameter('global_trajectory_topic').value
         global_traj_vis_topic = self.get_parameter('global_traj_vis_topic').value
         local_traj_vis_topic = self.get_parameter('local_traj_vis_topic').value
         self.visual_mode = self.get_parameter('visual_mode').value
         self.log_mode = self.get_parameter('log_mode').value
+        self.is_publish_global_traj = self.get_parameter('publish_global_traj').value
         self.yaw_offset = self.get_parameter('yaw_offset').value
 
         # Class Members
@@ -58,13 +62,13 @@ class LatticePlanner(Node):
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
         self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
+        if self.is_publish_global_traj:
+            self.global_traj_pub = self.create_publisher(JointTrajectory, global_traj_topic, 1)
         self.global_traj_vis_pub = self.create_publisher(Marker, global_traj_vis_topic, 1)
         self.local_traj_vis_pub = self.create_publisher(Marker, local_traj_vis_topic, 1)
-        # self.global_traj_vis_pub = self.create_publisher(MarkerArray, global_traj_vis_topic, 1)
-        # self.local_traj_vis_pub = self.create_publisher(MarkerArray, local_traj_vis_topic, 1)
 
-        # Visualizations
-        self.global_traj_vis_timer = self.create_timer(2.0, self.global_traj_vis_timer_callback)
+        # Global Trajectory
+        self.global_traj_timer = self.create_timer(1.0, self.publish_global_traj)
 
     def initialize_graph_ltpl(self):
         # Intialize Graph_LTPL Class
@@ -86,6 +90,8 @@ class LatticePlanner(Node):
             import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[4]
         self.vel_rl = graph_ltpl.imp_global_traj.src.\
             import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[6]
+        self.kappa = graph_ltpl.imp_global_traj.src.\
+            import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[7]
         self.traj_line = get_traj_line(self.refline, self.norm_vec, self.alpha)
 
         # Set Start Position
@@ -115,7 +121,7 @@ class LatticePlanner(Node):
 
         # Publish Selected Trajectory
         local_path = np.array(self.traj_set[sel_action][0])
-        self.publish_local_traj(local_path)
+        self.traj_pub.publish(self.traj_msg(local_path))
 
         # Visualize Trajectory
         local_marker_msg = wp_map_line_vis_msg(local_path[:,1:3], self.get_clock().now().to_msg(),
@@ -126,7 +132,7 @@ class LatticePlanner(Node):
         self.ltpl_obj.log()
         self.ltpl_obj.visual()
 
-    def publish_local_traj(self, traj):
+    def traj_msg(self, traj):
         # Write Local Trajectory to ROS Message
         msg = JointTrajectory()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -139,15 +145,17 @@ class LatticePlanner(Node):
             pt.accelerations.append(wp[6])
             pt.effort.append(wp[4]) # use effort to store curvature
             msg.points.append(pt)
+        return msg
 
-        # Send Trajectories to Controller
-        # select a trajectory from the set and send it to the controller here
-        self.traj_pub.publish(msg)
+    def publish_global_traj(self):
+        # Publish
+        if self.is_publish_global_traj:
+            global_traj = np.concatenate((np.zeros((len(self.traj_line), 1)), self.traj_line, 
+                                        np.zeros((len(self.traj_line), 1)), np.array([self.kappa]).T, 
+                                        np.array([self.vel_rl]).T, np.zeros((len(self.traj_line), 1))), axis=1)
+            self.global_traj_pub.publish(self.traj_msg(global_traj))
 
-    # def vis_local_traj(self):
-    #     self.local_traj_vis_pub.publish(wp_map_line_vis_msg(self.chosen_local_line, self.get_clock().now().to_msg()))
-
-    def global_traj_vis_timer_callback(self):
+        # Visualization
         global_traj_marker_msg = wp_map_line_with_vel_vis_msg(
             self.traj_line, self.vel_rl, self.get_clock().now().to_msg(), wrap=True, scale=0.05)
         self.global_traj_vis_pub.publish(global_traj_marker_msg)
