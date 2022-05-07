@@ -8,7 +8,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import LaserScan
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 from tf_transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix
 from ament_index_python.packages import get_package_share_directory
 import pathlib
@@ -45,8 +45,8 @@ class ObjectDetect(Node):
         # Subscribers & Publishers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
         self.laser_sub = self.create_subscription(LaserScan, laserscan_topic, self.lidar_callback, 10)
-        self.obstacle_vis_pub = self.create_publisher(Marker, obstacle_vis_topic, 1)
-        self.disparity_vis_pub = self.create_publisher(Marker, disparity_vis_topic, 1)
+        self.obstacle_vis_pub = self.create_publisher(MarkerArray, obstacle_vis_topic, 1)
+        self.disparity_vis_pub = self.create_publisher(MarkerArray, disparity_vis_topic, 1)
     
         #TODO: import map that has inside and outside bounds specified
 
@@ -82,16 +82,19 @@ class ObjectDetect(Node):
 
         #convert indices to x,y pos from car frame
         if len(disparities) != 0:
-            angle = angle_inc * disparities - (3*np.pi()/4)
-            car_x = np.take(ranges, [disparities]) * math.cos(angle)
-            car_y = np.take(ranges, [disparities]) * math.sin(angle)
+            angle = angle_inc * disparities - (3*np.pi/4)
+            car_x = np.take(ranges, [disparities])[0] * np.cos(angle)
+            car_y = np.take(ranges, [disparities])[0] * np.sin(angle)
+            # print('disparities', disparities)
+            # print('car x', car_x)
+            # print('car y', car_y)
             return disparities, car_x, car_y
         else:
-            print('no disparities')
+            # print('no disparities')
             return disparities, [], []
     
     def disparities_xy(self, odom_msg, car_x, car_y):
-        disparities_world = np.empty(len(car_x))
+        disparities_world = np.zeros((len(car_x), 2))
         for i in range(len(disparities_world)):
             x, y = self.transform_car_to_global(odom_msg, car_x[i], car_y[i]) 
             disparities_world[i] = [x, y]
@@ -102,7 +105,7 @@ class ObjectDetect(Node):
 
     def obstacle_pos(self, data):
         """
-        Filters through gaps between disparites to find obstacles. Finds location of obstacle
+        Filters through gaps between disparities to find obstacles. Finds location of obstacle
         Args: 
             disparities indices
             processed lidar data
@@ -119,14 +122,14 @@ class ObjectDetect(Node):
         
     def lidar_callback(self, scan_msg):
         proc_ranges = self.preprocess_lidar(scan_msg.ranges, scan_msg.angle_increment, scan_msg.range_min)
-        self.disparites, self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
+        self.disparities, self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
         # disparity_loc = 
     
     def odom_callback(self, odom_msg):
         disparities_world = self.disparities_xy(odom_msg, self.car_x, self.car_y)
         #visualize disparities
-        print('disparities_world',disparities_world)
-        self.publish_disparities_vis(disparities_world)
+        if len(disparities_world) > 0:
+            self.publish_disparities_vis(disparities_world)
 
     def transform_car_to_global(self, odom_msg, goal_x, goal_y):
         quaternion = [odom_msg.pose.pose.orientation.x,
@@ -148,6 +151,7 @@ class ObjectDetect(Node):
     #visualization functions:
     def publish_disparities_vis(self, disparities_world):
         #publishes disparities on rviz
+        print('disparity world shape', np.shape(disparities_world))
         disparity_marker_msg = wp_map_pt_vis_msg(disparities_world, self.get_clock().now().to_msg(),
                                                rgba=[0.0, 255.0, 255.0, 0.8])
         self.disparity_vis_pub.publish(disparity_marker_msg)
