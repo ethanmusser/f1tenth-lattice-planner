@@ -11,7 +11,7 @@ def adaptive_breakpoint_detection(r, lam, amin=radians(-135), amax=radians(135),
 
     :param r: LiDAR ranges
     :type r: np.ndarray
-    :param lam: Worst-case incidence angle on a line for point detection in radians
+    :param lam: Worst-case incidence angle on a line for point detection in range [0, pi/2] radians
     :type lam: float 
     :param amin: Minimum LiDAR angle in radians
     :type amin: float
@@ -44,6 +44,35 @@ def adaptive_breakpoint_detection(r, lam, amin=radians(-135), amax=radians(135),
             b[i] = 1
     
     return b, p
+
+
+def get_clusters(b, p):
+    """
+    Gathers clusters from breakpoints.
+
+    :param b: Array of breakpoints
+    :type b: np.ndarray
+    :param p: (n, 2) array of points in body frame
+    :type p: np.ndarray
+    :return: Ordered clusters of points
+    :rtype: tuple
+    """
+    # Input Validation
+    assert len(b) == len(p), 'Array lengths must match.'
+
+    # Compute Clusters
+    n = np.shape(b)[0]
+    inds = np.nonzero(b)[0]
+    c = ([],)
+    cidx = 0
+    for i in range(1, n):
+        if i in inds and b[i-1]:
+            c = (c, [p[i]])
+            cidx += 1
+        else:
+            c[cidx].append(p[i])
+    
+    return c
 
 
 def find_opp_bounds(r, disp, amin=radians(-135), amax=radians(135), ainc=radians(0.25)):
