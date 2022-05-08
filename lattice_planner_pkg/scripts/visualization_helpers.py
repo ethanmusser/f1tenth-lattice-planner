@@ -5,8 +5,20 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
-def wp_vis_msg(xy, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.3,
-                   dur=Duration(seconds=0.5).to_msg(), frame='map', log=False):
+
+ARROW = 0
+CUBE = 1
+SPHERE = 2
+CYLINDER = 3
+LINE_STRIP = 4
+LINE_LIST = 5
+CUBE_LIST = 6
+SPHERE_LIST = 7
+POINTS = 8
+
+
+def wp_vis_msg(xy, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.3, marktype=SPHERE,
+               dur=Duration(seconds=0.5).to_msg(), frame='map', log=False):
     """
     """
     if log:
@@ -15,7 +27,7 @@ def wp_vis_msg(xy, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.3,
     marker = Marker()
     marker.header.stamp = ts
     marker.header.frame_id = frame
-    marker.type = marker.SPHERE
+    marker.type = marktype
     marker.pose.position.x = xy[0]
     marker.pose.position.y = xy[1]
     marker.scale.x = scale
@@ -30,7 +42,7 @@ def wp_vis_msg(xy, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.3,
     return marker
 
 
-def wp_map_pt_vis_msg(path, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.1, 
+def wp_map_pt_vis_msg(path, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.1, marktype=SPHERE,
                        dur=None, frame='map'):
     """
     """
@@ -40,7 +52,7 @@ def wp_map_pt_vis_msg(path, ts, rgba=[255.0, 0.0, 0.0, 1.0], scale=0.1,
         marker.header.stamp = ts
         marker.header.frame_id = frame
         marker.id = idx
-        marker.type = marker.SPHERE
+        marker.type = marktype
         marker.pose.position.x = ps[0]
         marker.pose.position.y = ps[1]
         marker.scale.x = scale
