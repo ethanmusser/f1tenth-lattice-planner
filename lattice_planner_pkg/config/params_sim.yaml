@@ -49,7 +49,8 @@ object_detect_node:
     lambda: 0.1047
     sigma: 0.05
     bound_offset: 0.2 
-    opponent_offset: 0.1 
+    opponent_offset_x: 0.1 
+    opponent_offset_y: 0.0 
 
 waypoint_logger_service:
   ros__parameters:

@@ -12,7 +12,7 @@ from std_msgs.msg import String
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker, MarkerArray
-from tf_transformations import quaternion_matrix
+from tf_transformations import euler_matrix, euler_from_quaternion, quaternion_from_euler, quaternion_matrix
 
 
 class ObjectDetect(Node):
@@ -35,7 +35,8 @@ class ObjectDetect(Node):
         self.declare_parameter('lambda')
         self.declare_parameter('sigma')
         self.declare_parameter('bound_offset')
-        self.declare_parameter('opponent_offset')
+        self.declare_parameter('opponent_offset_x')
+        self.declare_parameter('opponent_offset_y')
 
         # Class Variables
         self.lidar_max_dist = self.get_parameter('lidar_proc_max_dist').value
@@ -43,7 +44,8 @@ class ObjectDetect(Node):
         self.lamb = self.get_parameter('lambda').value
         self.sigma = self.get_parameter('sigma').value
         self.bound_offset = self.get_parameter('bound_offset').value
-        self.opponent_offset = self.get_parameter('opponent_offset').value
+        self.opponent_offset_x = self.get_parameter('opponent_offset_x').value
+        self.opponent_offset_y = self.get_parameter('opponent_offset_y').value
 
         #topics
         odom_topic = self.get_parameter('odometry_topic').value
@@ -110,9 +112,9 @@ class ObjectDetect(Node):
         #visualize clusters
         self.visualize_clusters(self.proc_clusters_world)
         #find obstacles
-        p_cm, heading = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body)
+        p_cm_w, phi_w = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body, self.opponent_offset_x, self.opponent_offset_y)
         #visualize obstacles
-        self.visualize_obstacles(p_cm)
+        self.visualize_obstacles(p_cm_w)
     
     def local_planner_inputs(self):
         pass
@@ -148,23 +150,46 @@ class ObjectDetect(Node):
         goal_m = tform_b_m.dot(goal_b).flatten()
         return goal_m[0], goal_m[1]
 
-    def estimate_opponent_pose(self, odom_msg, clusters):
+    def estimate_opponent_pose(self, odom_msg, clusters, xoff, yoff):
         """
         Returns theta and opponent position (x,y)
         """
-        p_cm_all = []
-        heading_all = []
+        p_cm_w_all = []
+        phi_w_all = []
         for cluster in clusters:
             p_i1 = np.array(cluster[0])
             p_i = np.array(cluster[-1])
-            p_cm = 0.5 * (p_i + p_i1) + np.array([self.opponent_offset, 0.0])
+            p_c_b = 0.5 * (p_i + p_i1)
+            p_c_w = self.transform_car_to_global(odom_msg, p_c_b[0], p_c_b[1])
             r_diff = p_i - p_i1
-            r_f = np.cross(np.concatenate((r_diff, [0])), np.array([0,0,1])) 
-            r_f_world = self.transform_car_to_global(odom_msg, r_f[0], r_f[1])
-            heading = np.arctan2(r_f_world[1], r_f_world[0])
-            p_cm_all.append(p_cm)
-            heading_all.append(heading)
-        return p_cm_all, heading_all
+            r_f_b = np.cross(np.concatenate((r_diff, [0])), np.array([0,0,1])) 
+            r_f_w = self.transform_car_to_global(odom_msg, r_f_b[0], r_f_b[1])
+            r_f_w = r_f_w / np.linalg.norm(r_f_w)
+            p_cm_w = p_c_w + np.array([xoff, yoff]) @ r_f_w
+            phi_w = np.arctan2(r_f_w[1], r_f_w[0])
+            p_cm_w_all.append(p_cm_w)
+            phi_w_all.append(phi_w)
+        return p_cm_w_all, phi_w_all
+
+    def offset_body_frame_point(self, xw, yw, yaw, xoff, yoff):
+        """
+        World frame to any vehicle frame
+        """
+        # Transforation Matrix
+        rot_b = euler_matrix(0.0, 0.0, yaw, 'sxyz')[:3, :3]
+        p_w = np.array([xw, yw, 0.0])
+        print('rot_b', rot_b)
+        tform_b_w = np.zeros((4, 4))
+        tform_b_w[:3, :3] = rot_b
+        tform_b_w[:3, 3] = p_w
+        tform_b_w[-1, -1] = 1
+        tform_b_w = np.linalg.inv(tform_b_w)
+
+        # 
+        p_b = (tform_b_w @ np.concatenate((p_w, [1]))).flatten()
+        p_off_b = p_b + np.array([xoff, yoff, 0.0, 1.0])
+        p_off_w = (np.linalg.inv(tform_b_w) @ p_off_b).flatten()
+        return p_off_w[0], p_off_w[1] 
 
     def body_clusters_to_world(self, odom_msg, clusters):
         clusters_world = copy.deepcopy(clusters)
