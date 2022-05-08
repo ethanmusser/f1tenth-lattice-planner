@@ -6,6 +6,8 @@ lattice_planner_node:
     odometry_topic: '/ego_racecar/odom'
     trajectory_topic: '/lattice_planner/local_traj'
     global_trajectory_topic: '/lattice_planner/global_traj'
+    toppath_topic: '/lattice_planner/toppath'
+    map_spec_topic: '/lattice_planner/map_specifier'
     global_traj_vis_topic: '/lattice_planner/global_traj_vis_topic'
     local_traj_vis_topic: '/lattice_planner/local_traj_vis_topic'
     visual_mode: False
@@ -41,11 +43,14 @@ object_detect_node:
     obstacle_vis_topic: '/obstacle_detect/obstacle_vis_topic'
     disparitiy_vis_topic: '/obstacle_detect/disparity_vis_topic'
     clusters_vis_topic: '/obstacle_detect/clusters_vis_topic'
+    toppath_topic: '/lattice_planner/toppath'
+    map_spec_topic: '/lattice_planner/map_specifier'
     lidar_proc_max_dist: 10.0
     disparity_threshold: 0.2
     gap_threshold: 1.5
     lambda: 0.1047
     sigma: 0.05
+    bound_offset: 0.2 
 
 waypoint_logger_service:
   ros__parameters:

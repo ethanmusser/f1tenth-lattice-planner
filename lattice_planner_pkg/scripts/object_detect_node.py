@@ -3,10 +3,12 @@ from dis import dis
 from visualization_helpers import *
 from opp_pose_estimation import *
 from graph_ltpl.online_graph.src.check_inside_bounds import check_inside_bounds
+from graph_ltpl_helpers import get_path_dict, get_traj_line, import_global_traj
 import rclpy
 from rclpy.node import Node
 import numpy as np
 from scipy.interpolate import splprep, splev
+from std_msgs.msg import String
 from ackermann_msgs.msg import AckermannDriveStamped
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import LaserScan
@@ -30,6 +32,8 @@ class ObjectDetect(Node):
         self.declare_parameter('disparity_threshold')
         self.declare_parameter('odometry_topic')
         self.declare_parameter('laserscan_topic')
+        self.declare_parameter('toppath_topic')
+        self.declare_parameter('map_spec_topic')
         self.declare_parameter('obstacle_vis_topic')
         self.declare_parameter('disparitiy_vis_topic')
         self.declare_parameter('clusters_vis_topic')
@@ -49,6 +53,8 @@ class ObjectDetect(Node):
         #topics
         odom_topic = self.get_parameter('odometry_topic').value
         laserscan_topic = self.get_parameter('laserscan_topic').value
+        toppath_topic = self.get_parameter('toppath_topic').value
+        map_spec_topic = self.get_parameter('map_spec_topic').value
         obstacle_vis_topic = self.get_parameter('obstacle_vis_topic').value
         disparity_vis_topic = self.get_parameter('disparitiy_vis_topic').value
         clusters_vis_topic = self.get_parameter('clusters_vis_topic').value
@@ -56,17 +62,26 @@ class ObjectDetect(Node):
         # Subscribers & Publishers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
         self.laser_sub = self.create_subscription(LaserScan, laserscan_topic, self.lidar_callback, 10)
+        self.toppath_sub = self.create_subscription(String, toppath_topic, self.toppath_callback, 10)
+        self.map_spec_sub = self.create_subscription(String, map_spec_topic, self.map_spec_callback, 10)
         self.obstacle_vis_pub = self.create_publisher(MarkerArray, obstacle_vis_topic, 1)
         self.disparity_vis_pub = self.create_publisher(MarkerArray, disparity_vis_topic, 1)
         self.clusters_vis_pub = self.create_publisher(MarkerArray, clusters_vis_topic, 1)
 
-        #track bounds:
-        # bound1 = (self.__graph_base.refline + self.__graph_base.normvec_normalized
-        #           * np.expand_dims(self.__graph_base.track_width_right, 1))
-        # bound2 = (self.__graph_base.refline - self.__graph_base.normvec_normalized
-        #           * np.expand_dims(self.__graph_base.track_width_left, 1))
-
-        #TODO: import map that has inside and outside bounds specified
+        # Track Trajectory
+        self.toppath = None
+        self.map_spec = None
+        self.path_dict = None
+        self.refline = None
+        self.w_right = None
+        self.w_left = None
+        self.norm_vec = None
+        self.s = None
+        self.psi = None
+        self.vel_rl = None
+        self.bound1 = None
+        self.bound2 = None
+        self.clusters = None
 
     def preprocess_lidar(self, ranges, angle_inc, range_min):
         """
@@ -115,31 +130,50 @@ class ObjectDetect(Node):
             return [], []
 
     def postprocess_clusters(self, clusters):
-        print('clusters shape', len(clusters))
         new_cluster = ()
         for cluster in clusters:
+            out_of_bounds = False
             for i in range(len(cluster)):
                 if not (check_inside_bounds(self.bound1, self.bound2, cluster[i])):
-                    print('out of bounds')
+                    out_of_bounds = True
                     break
-            print('valid cluster')
-        # return new_cluster
+            if not out_of_bounds:
+                new_cluster = new_cluster + (cluster,)
+        return new_cluster
 
     #Callback functions
     def lidar_callback(self, scan_msg):
+        if self.bound1 is None:
+            return
         proc_ranges = self.preprocess_lidar(scan_msg.ranges, scan_msg.angle_increment, scan_msg.range_min)
         b, p = adaptive_breakpoint_detection(scan_msg.ranges, self.lamb, self.sigma, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
         self.clusters = get_clusters(b, p)        
-        self.postprocess_clusters(self.clusters)
+        self.new_clusters = self.postprocess_clusters(self.clusters)
         
         #disparity approach
         self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
 
     def odom_callback(self, odom_msg):
+        if self.clusters is None:
+            return
         #uncomment below code for disparity approach
         # self.publish_disparities_vis(odom_msg)
         #uncomment below function for clusters approach
-        self.visualize_clusters(odom_msg, self.clusters)
+        self.visualize_clusters(odom_msg, self.new_clusters)
+    
+    def toppath_callback(self, msg):
+        if self.toppath is None:
+            self.toppath = msg.data
+        if self.path_dict is None and self.toppath is not None and self.map_spec is not None:
+            self.path_dict = get_path_dict(self.toppath, self.map_spec)
+            self.refline, self.w_right, self.w_left, self.norm_vec, _, self.s, self.psi, _, self.vel_rl, _ = \
+                import_global_traj(import_path=self.path_dict['globtraj_input_path'])
+            self.bound1 = (self.refline + self.norm_vec * np.expand_dims(self.w_right - self.bound_offset, 1))
+            self.bound2 = (self.refline - self.norm_vec * np.expand_dims(self.w_left - self.bound_offset, 1))
+
+    def map_spec_callback(self, msg):
+        if self.map_spec is None:
+            self.map_spec = msg.data
 
     def transform_car_to_global(self, odom_msg, goal_x, goal_y):
         quaternion = [odom_msg.pose.pose.orientation.x,

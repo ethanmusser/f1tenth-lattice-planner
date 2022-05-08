@@ -5,6 +5,7 @@ from graph_ltpl_helpers import get_path_dict, get_traj_line, import_global_traj
 import graph_ltpl
 from graph_ltpl.helper_funcs.src.get_s_coord import get_s_coord
 from graph_ltpl.imp_global_traj.src.import_globtraj_csv import import_globtraj_csv
+from std_msgs.msg import String
 from trajectory_planning_helpers.calc_splines import calc_splines
 from trajectory_planning_helpers.interp_splines import interp_splines
 from trajectory_planning_helpers.calc_head_curv_an import calc_head_curv_an
@@ -35,6 +36,8 @@ class LatticePlanner(Node):
         self.declare_parameter('odometry_topic')
         self.declare_parameter('trajectory_topic')
         self.declare_parameter('global_trajectory_topic')
+        self.declare_parameter('toppath_topic')
+        self.declare_parameter('map_spec_topic')
         self.declare_parameter('global_traj_vis_topic')
         self.declare_parameter('local_traj_vis_topic')
         self.declare_parameter('visual_mode')
@@ -50,6 +53,8 @@ class LatticePlanner(Node):
         odom_topic = self.get_parameter('odometry_topic').value
         traj_topic = self.get_parameter('trajectory_topic').value
         global_traj_topic = self.get_parameter('global_trajectory_topic').value
+        toppath_topic = self.get_parameter('toppath_topic').value
+        map_spec_topic = self.get_parameter('map_spec_topic').value
         global_traj_vis_topic = self.get_parameter('global_traj_vis_topic').value
         local_traj_vis_topic = self.get_parameter('local_traj_vis_topic').value
         self.visual_mode = self.get_parameter('visual_mode').value
@@ -73,6 +78,8 @@ class LatticePlanner(Node):
         self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
         if self.is_publish_global_traj:
             self.global_traj_pub = self.create_publisher(JointTrajectory, global_traj_topic, 1)
+        self.toppath_pub = self.create_publisher(String, toppath_topic, 1)
+        self.map_spec_pub = self.create_publisher(String, map_spec_topic, 1)
         self.global_traj_vis_pub = self.create_publisher(Marker, global_traj_vis_topic, 1)
         self.local_traj_vis_pub = self.create_publisher(Marker, local_traj_vis_topic, 1)
 
@@ -183,6 +190,14 @@ class LatticePlanner(Node):
         # Break if Trajectory Not Available
         if not self.graph_ltpl_up:
             return None
+        
+        # Filepath Pubs
+        tp_msg = String()
+        tp_msg.data = self.toppath
+        self.toppath_pub.publish(tp_msg)
+        ms_msg = String()
+        ms_msg.data = self.track_specifier
+        self.map_spec_pub.publish(ms_msg)
         
         # Publish
         if self.is_publish_global_traj:

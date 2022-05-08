@@ -47,7 +47,6 @@ def adaptive_breakpoint_detection(r, lam, sigma=0.0, amin=radians(-135), amax=ra
     min_idx = int((np.radians(-90) - amin)//ainc + 1)
     b[0:min_idx] = 0
     b[-min_idx:-1] = 0
-    print('b',b)
     return b, p
 
 
