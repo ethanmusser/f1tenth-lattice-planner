@@ -40,10 +40,11 @@ object_detect_node:
   ros__parameters:
     odometry_topic: '/ego_racecar/odom'
     laserscan_topic: '/scan'
-    obstacle_vis_topic: '/obstacle_detect/obstacle_vis_topic'
-    clusters_vis_topic: '/obstacle_detect/clusters_vis_topic'
+    obstacle_vis_topic: '/obstacle_detect/obstacle_vis'
+    clusters_vis_topic: '/obstacle_detect/clusters_vis'
     toppath_topic: '/lattice_planner/toppath'
     map_spec_topic: '/lattice_planner/map_specifier'
+    opponent_list_topic: '/object_detect/opponent_list'
     lidar_proc_max_dist: 10.0
     gap_threshold: 1.5
     lambda: 0.1047

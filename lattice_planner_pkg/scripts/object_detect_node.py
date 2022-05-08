@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from dis import dis
 from visualization_helpers import *
 from opp_pose_estimation import *
 from graph_ltpl.online_graph.src.check_inside_bounds import check_inside_bounds
@@ -12,8 +11,8 @@ from std_msgs.msg import String
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker, MarkerArray
-from tf_transformations import euler_matrix, euler_from_quaternion, quaternion_from_euler, quaternion_matrix
-
+from tf_transformations import quaternion_from_euler, quaternion_matrix
+from geometry_msgs.msg import PoseArray, Pose
 
 class ObjectDetect(Node):
     """ 
@@ -31,6 +30,7 @@ class ObjectDetect(Node):
         self.declare_parameter('map_spec_topic')
         self.declare_parameter('obstacle_vis_topic')
         self.declare_parameter('clusters_vis_topic')
+        self.declare_parameter('opponent_list_topic')
         self.declare_parameter('gap_threshold')
         self.declare_parameter('lambda')
         self.declare_parameter('sigma')
@@ -54,14 +54,16 @@ class ObjectDetect(Node):
         map_spec_topic = self.get_parameter('map_spec_topic').value
         obstacle_vis_topic = self.get_parameter('obstacle_vis_topic').value
         clusters_vis_topic = self.get_parameter('clusters_vis_topic').value
-
+        opp_list_topic = self.get_parameter('opponent_list_topic').value
+        
         # Subscribers & Publishers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
-        self.laser_sub = self.create_subscription(LaserScan, laserscan_topic, self.lidar_callback, 10)
-        self.toppath_sub = self.create_subscription(String, toppath_topic, self.toppath_callback, 10)
-        self.map_spec_sub = self.create_subscription(String, map_spec_topic, self.map_spec_callback, 10)
+        self.laser_sub = self.create_subscription(LaserScan, laserscan_topic, self.lidar_callback, 1)
+        self.toppath_sub = self.create_subscription(String, toppath_topic, self.toppath_callback, 1)
+        self.map_spec_sub = self.create_subscription(String, map_spec_topic, self.map_spec_callback, 1)
         self.obstacle_vis_pub = self.create_publisher(MarkerArray, obstacle_vis_topic, 1)
         self.clusters_vis_pub = self.create_publisher(MarkerArray, clusters_vis_topic, 1)
+        self.opp_list_pub = self.create_publisher(PoseArray, opp_list_topic, 1)
 
         # Track Trajectory
         self.toppath = None
@@ -115,10 +117,28 @@ class ObjectDetect(Node):
         p_cm_w, phi_w = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body, self.opponent_offset_x, self.opponent_offset_y)
         #visualize obstacles
         self.visualize_obstacles(p_cm_w)
+        #publish opponent list
+        self.publish_opponent_list(p_cm_w, phi_w)
     
-    def local_planner_inputs(self):
-        pass
-    
+    def publish_opponent_list(self, p_cm, phi_w):
+        msg = PoseArray()
+        for p, phi in zip(p_cm, phi_w):
+            msg.header.stamp = self.get_clock().now().to_msg()
+            quat = quaternion_from_euler(0.0, 0.0, phi, 'sxyz')
+            pose = Pose()
+            pose.position.x = p[0]
+            pose.position.y = p[1]
+            pose.position.z = 0.0
+            pose.orientation.x = quat[0]
+            pose.orientation.y = quat[1]
+            pose.orientation.z = quat[2]
+            pose.orientation.w = quat[3]
+            msg.poses.append(pose)
+        self.opp_list_pub.publish(msg)
+
+
+
+
     def toppath_callback(self, msg):
         if self.toppath is None:
             self.toppath = msg.data
