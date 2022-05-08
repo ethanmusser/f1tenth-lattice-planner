@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 from visualization_helpers import *
 from nav_msgs.msg import Odometry
-from graph_ltpl_helpers import get_path_dict, get_traj_line
+from graph_ltpl_helpers import get_path_dict, get_traj_line, import_global_traj
 import graph_ltpl
+from graph_ltpl.helper_funcs.src.get_s_coord import get_s_coord
+from graph_ltpl.imp_global_traj.src.import_globtraj_csv import import_globtraj_csv
+from trajectory_planning_helpers.calc_splines import calc_splines
+from trajectory_planning_helpers.interp_splines import interp_splines
+from trajectory_planning_helpers.calc_head_curv_an import calc_head_curv_an
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -36,6 +41,7 @@ class LatticePlanner(Node):
         self.declare_parameter('log_mode')
         self.declare_parameter('publish_global_traj')
         self.declare_parameter('yaw_offset')
+        self.declare_parameter('start_vel')
 
         # Read Parameters
         self.toppath = self.get_parameter('toppath').value
@@ -50,6 +56,7 @@ class LatticePlanner(Node):
         self.log_mode = self.get_parameter('log_mode').value
         self.is_publish_global_traj = self.get_parameter('publish_global_traj').value
         self.yaw_offset = self.get_parameter('yaw_offset').value
+        self.start_vel = self.get_parameter('start_vel').value
 
         # Class Members
         self.pos = None
@@ -58,6 +65,8 @@ class LatticePlanner(Node):
         self.traj_set = {'straight': None}
         self.tic = self.get_clock().now()
         self.graph_ltpl_up = False
+        self.start_path = None
+        self.path_reached = False
 
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
@@ -69,6 +78,10 @@ class LatticePlanner(Node):
 
         # Global Trajectory
         self.global_traj_timer = self.create_timer(1.0, self.publish_global_traj)
+
+    def import_global_traj(self, import_path):
+        self.refline, _, _, self.norm_vec, self.alpha, self.s, _, self.kappa_rl, self.vel_rl, self.acc_rl = \
+            import_global_traj(import_path=import_path)
 
     def initialize_graph_ltpl(self):
         # Intialize Graph_LTPL Class
@@ -82,16 +95,7 @@ class LatticePlanner(Node):
 
         # Read Map Params & Trajectory
         map_params = yaml.safe_load(self.mappath + '.yaml')
-        self.refline = graph_ltpl.imp_global_traj.src.\
-            import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[0]
-        self.norm_vec = graph_ltpl.imp_global_traj.src.\
-            import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[3]
-        self.alpha = graph_ltpl.imp_global_traj.src.\
-            import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[4]
-        self.vel_rl = graph_ltpl.imp_global_traj.src.\
-            import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[6]
-        self.kappa = graph_ltpl.imp_global_traj.src.\
-            import_globtraj_csv.import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[7]
+        self.import_global_traj(import_path=path_dict['globtraj_input_path'])
         self.traj_line = get_traj_line(self.refline, self.norm_vec, self.alpha)
 
         # Set Start Position
@@ -102,7 +106,26 @@ class LatticePlanner(Node):
             self.graph_ltpl_up = True
         else:
             self.get_logger().info('Vehicle not in track.')
-
+    
+    def compute_start_path(self, pos, yaw, vel, path):
+        self.get_logger().info('Computing start trajectory.')
+        x_coeff, y_coeff, _, normvec = calc_splines(path=np.array([pos, path[0, 1:3]]), 
+                                                    psi_s=yaw, 
+                                                    psi_e=path[0, 3])
+        xy, splinds, tvals, _ = interp_splines(coeffs_x=x_coeff, 
+                                               coeffs_y=y_coeff, 
+                                               stepsize_approx=np.mean(np.diff(path[:, 0])))
+        s = np.array([get_s_coord(self.refline, point)[0] for point in xy])
+        psi, kappa  = calc_head_curv_an(coeffs_x=x_coeff, 
+                                        coeffs_y=y_coeff, 
+                                        ind_spls=splinds,
+                                        t_spls=tvals)
+        # v = np.linspace(vel[0], path[0, 5], len(xy))
+        v = self.start_vel * np.ones((len(xy),))
+        a = np.concatenate(([0], np.diff(v)))
+        self.start_path = np.concatenate((np.array([s]).T, xy, np.array([psi]).T, 
+                                          np.array([kappa]).T, np.array([v]).T, np.array([a]).T), axis=1)
+    
     def update_local_plan(self):
         # Select Trajectory from List
         # (here: brute-force, replace by sophisticated behavior planner)
@@ -121,6 +144,15 @@ class LatticePlanner(Node):
 
         # Publish Selected Trajectory
         local_path = np.array(self.traj_set[sel_action][0])
+        if not self.path_reached:
+            cur_s, _ = get_s_coord(ref_line=self.refline, pos=self.pos, s_array=self.s)
+            start_s, _ = get_s_coord(ref_line=self.refline, pos=local_path[0, 1:3], s_array=self.s)
+            if cur_s < start_s:
+                if self.start_path is None:
+                    self.compute_start_path(pos=self.pos, yaw=self.yaw+self.yaw_offset, vel=self.vel, path=local_path)
+                local_path = np.concatenate((self.start_path, local_path))
+            else:
+                self.path_reached = True
         self.traj_pub.publish(self.traj_msg(local_path))
 
         # Visualize Trajectory
@@ -155,7 +187,7 @@ class LatticePlanner(Node):
         # Publish
         if self.is_publish_global_traj:
             global_traj = np.concatenate((np.zeros((len(self.traj_line), 1)), self.traj_line, 
-                                        np.zeros((len(self.traj_line), 1)), np.array([self.kappa]).T, 
+                                        np.zeros((len(self.traj_line), 1)), np.array([self.kappa_rl]).T, 
                                         np.array([self.vel_rl]).T, np.zeros((len(self.traj_line), 1))), axis=1)
             self.global_traj_pub.publish(self.traj_msg(global_traj))
 

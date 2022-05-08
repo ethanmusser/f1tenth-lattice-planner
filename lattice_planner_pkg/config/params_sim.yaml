@@ -11,7 +11,8 @@ lattice_planner_node:
     visual_mode: False
     log_mode: False
     publish_global: False
-    yaw_offset: 3.1415
+    yaw_offset: -1.5708
+    start_vel: 3.0
 
 pure_pursuit_node:
   ros__parameters:
