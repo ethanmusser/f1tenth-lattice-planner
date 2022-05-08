@@ -33,12 +33,14 @@ class ObjectDetect(Node):
         self.declare_parameter('clusters_vis_topic')
         self.declare_parameter('gap_threshold')
         self.declare_parameter('lambda')
+        self.declare_parameter('sigma')
 
         # Class Variables
         self.lidar_max_dist = self.get_parameter('lidar_proc_max_dist').value
         self.disparity_threshold = self.get_parameter('disparity_threshold').value
         self.gap_threshold = self.get_parameter('gap_threshold').value
         self.lamb = self.get_parameter('lambda').value
+        self.sigma = self.get_parameter('sigma').value
 
         #topics
         odom_topic = self.get_parameter('odometry_topic').value
@@ -128,7 +130,7 @@ class ObjectDetect(Node):
         
     def lidar_callback(self, scan_msg):
         proc_ranges = self.preprocess_lidar(scan_msg.ranges, scan_msg.angle_increment, scan_msg.range_min)
-        b, p = adaptive_breakpoint_detection(proc_ranges, self.lamb, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
+        b, p = adaptive_breakpoint_detection(proc_ranges, self.lamb, self.sigma, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
         self.clusters = get_clusters(b, p)        
         #uncomment below code for disparity approach
         # self.disparities, self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
@@ -150,10 +152,8 @@ class ObjectDetect(Node):
 
     def odom_callback(self, odom_msg):
         #uncomment below code for disparity approach
-        # disparities_world = self.disparities_xy(odom_msg, self.car_x, self.car_y)
-        #visualize disparities
-        # if len(disparities_world) > 0:
-        #     self.publish_disparities_vis(disparities_world)
+        # self.publish_disparities_vis(odom_msg)
+        #uncomment below function for clusters approach
         self.visualize_clusters(odom_msg, self.clusters)
 
         
@@ -175,20 +175,22 @@ class ObjectDetect(Node):
         goal_m = tform_b_m.dot(goal_b).flatten()
         return goal_m[0], goal_m[1]
 
+    #visualization functions:
     def publish_clusters_vis(self, clusters_world):
         #publishes disparities on rviz
         print('clusters world shape', np.shape(clusters_world))
         clusters_marker_msg = wp_map_pt_vis_msg(clusters_world, self.get_clock().now().to_msg(),
-                                               rgba=[0.0, 255.0, 255.0, 0.8])
+                                               rgba=[0.0, 255.0, 255.0, 0.8], dur = Duration(seconds =0.3).to_msg())
         self.clusters_vis_pub.publish(clusters_marker_msg)
 
-    #visualization functions:
-    def publish_disparities_vis(self, disparities_world):
+    def publish_disparities_vis(self, odom_msg):
+        disparities_world = self.disparities_xy(odom_msg, self.car_x, self.car_y)
         #publishes disparities on rviz
         print('disparity world shape', np.shape(disparities_world))
         disparity_marker_msg = wp_map_pt_vis_msg(disparities_world, self.get_clock().now().to_msg(),
                                                rgba=[0.0, 255.0, 255.0, 0.8])
-        self.disparity_vis_pub.publish(disparity_marker_msg)
+        if len(disparities_world) > 0:
+            self.disparity_vis_pub.publish(disparity_marker_msg)
 
 
 
