@@ -31,6 +31,7 @@ class PurePursuit(Node):
         self.declare_parameter('waypoint_vis_topic')
         self.declare_parameter('lookahead_method')
         self.declare_parameter('use_global_traj')
+        self.declare_parameter('has_opponent')
         self.declare_parameter('steering_angle_bound')
         self.declare_parameter('desired_speed')
         self.declare_parameter('min_speed')
@@ -53,6 +54,7 @@ class PurePursuit(Node):
         self.max_lookahead = self.get_parameter('max_lookahead').value
         self.lookahead_method = self.get_parameter('lookahead_method').value
         use_global_traj = self.get_parameter('use_global_traj').value
+        has_opponent = self.get_parameter('has_opponent').value
 
         # Subscribers & Publishers
         if use_global_traj:
@@ -65,6 +67,11 @@ class PurePursuit(Node):
 
         # Path
         self.trajectory_up = False
+
+        # Opponent
+        if has_opponent:
+            self.opp_drive_pub = self.create_publisher(AckermannDriveStamped, '/opp_drive', 1)
+            self.opp_drive_timer = self.create_timer(1.0, self.opp_drive_callback)
 
     def find_cur_idx(self, odom_msg):
         position = np.array([odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y])
@@ -198,16 +205,15 @@ class PurePursuit(Node):
                         self.get_parameter('steering_angle_bound').value)
         msg = AckermannDriveStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'map'
         msg.drive.steering_angle = self.get_parameter('steering_angle_factor').value * angle
         msg.drive.speed = self.get_parameter('speed_factor').value * speed
         self.drive_pub.publish(msg)
 
-        return 0
-
     def publish_waypoint_vis_msg(self, x, y):
         """
         """
-        msg = wp_vis_msg([x, y], self.get_clock().now().to_msg())
+        msg = wp_vis_msg([x, y], self.get_clock().now().to_msg(), scale=0.2)
         self.wp_vis_pub.publish(msg)
     
     def traj_callback(self, traj_msg):
@@ -245,6 +251,17 @@ class PurePursuit(Node):
         # Publish drive message, don't forget to limit the steering angle.
         self.publish_drive_msg(desired_angle, self.vel[cur_idx])
         self.publish_waypoint_vis_msg(x_w, y_w)
+
+    def opp_drive_callback(self):
+        """
+        """
+        # Compute Control Input
+        msg = AckermannDriveStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'map'
+        msg.drive.steering_angle = 0.0
+        msg.drive.speed = 0.0
+        self.opp_drive_pub.publish(msg)
 
 
 def main(args=None):

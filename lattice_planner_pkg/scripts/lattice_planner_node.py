@@ -44,8 +44,11 @@ class LatticePlanner(Node):
         self.declare_parameter('visual_mode')
         self.declare_parameter('log_mode')
         self.declare_parameter('publish_global_traj')
+        self.declare_parameter('estimate_opponent_heading')
         self.declare_parameter('yaw_offset')
         self.declare_parameter('start_vel')
+        self.declare_parameter('opponent_length')
+        self.declare_parameter('opponent_width')
 
         # Read Parameters
         self.toppath = self.get_parameter('toppath').value
@@ -62,8 +65,11 @@ class LatticePlanner(Node):
         self.visual_mode = self.get_parameter('visual_mode').value
         self.log_mode = self.get_parameter('log_mode').value
         self.is_publish_global_traj = self.get_parameter('publish_global_traj').value
+        self.est_opp_heading = self.get_parameter('estimate_opponent_heading').value
         self.yaw_offset = self.get_parameter('yaw_offset').value
         self.start_vel = self.get_parameter('start_vel').value
+        self.opponent_length = self.get_parameter('opponent_length').value
+        self.opponent_width = self.get_parameter('opponent_width').value
 
         # Class Members
         self.pos = None
@@ -74,6 +80,7 @@ class LatticePlanner(Node):
         self.graph_ltpl_up = False
         self.start_path = None
         self.path_reached = False
+        self.opp_list = []
 
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
@@ -90,7 +97,7 @@ class LatticePlanner(Node):
         self.global_traj_timer = self.create_timer(1.0, self.publish_global_traj)
 
     def import_global_traj(self, import_path):
-        self.refline, _, _, self.norm_vec, self.alpha, self.s, _, self.kappa_rl, self.vel_rl, self.acc_rl = \
+        self.refline, _, _, self.norm_vec, self.alpha, self.s, self.psi_rl, self.kappa_rl, self.vel_rl, self.acc_rl = \
             import_global_traj(import_path=import_path)
 
     def initialize_graph_ltpl(self):
@@ -138,21 +145,21 @@ class LatticePlanner(Node):
     
     def update_local_plan(self):
         # Select Trajectory from List
-        # (here: brute-force, replace by sophisticated behavior planner)
-        # try to force 'right', else try next in list
         for sel_action in ["right", "left", "straight", "follow"]:
             if sel_action in self.traj_set.keys():
                 break
 
         # Compute Paths for next Time Step
         self.ltpl_obj.calc_paths(prev_action_id=sel_action,
-                                 object_list=[])
+                                 object_list=self.opp_list)
 
         # Compute Velocity Profile & Retrieve Tajectories
         self.traj_set = self.ltpl_obj.calc_vel_profile(pos_est=self.pos,
-                                                       vel_est=self.vel)[0]
+                                                       vel_est=self.vel[0])[0]
 
         # Publish Selected Trajectory
+        if sel_action not in self.traj_set.keys() or self.traj_set[sel_action] is None:
+            return
         local_path = np.array(self.traj_set[sel_action][0])
         if not self.path_reached:
             cur_s, _ = get_s_coord(ref_line=self.refline, pos=self.pos, s_array=self.s)
@@ -167,7 +174,7 @@ class LatticePlanner(Node):
 
         # Visualize Trajectory
         local_marker_msg = wp_map_line_vis_msg(local_path[:,1:3], self.get_clock().now().to_msg(),
-                                               rgba=[0.0, 0.0, 255.0, 0.8])
+                                               rgba=[0.0, 0.0, 255.0, 0.8], scale=0.05)
         self.local_traj_vis_pub.publish(local_marker_msg)
 
         # Log & Visualize (if enabled)
@@ -238,18 +245,20 @@ class LatticePlanner(Node):
         
         # Get Opponent States
         opp_list = []
-        for pose in msg.poses:
+        for idx, pose in enumerate(msg.poses):
             x = pose.position.x
             y = pose.position.y
             s = get_s_coord(self.refline, [x, y])[0]
+            if self.est_opp_heading:
+                yaw = np.interp(s, self.s, self.psi_rl)
+            else:
+                quat = [pose.orientation.x, pose.orientation.y,
+                        pose.orientation.z, pose.orientation.w]
+                _, _, yaw = euler_from_quaternion(quat, 'sxyz')
             v = np.interp(s, self.s, self.vel_rl)
-            quat = [pose.orientation.x, pose.orientation.y,
-                    pose.orientation.z, pose.orientation.w]
-            _, _, yaw = euler_from_quaternion(quat, 'sxyz')
-            opp_list.append([s, x, y, yaw, v])
-        self.opp_list = np.array(opp_list)
-        print(self.opp_list)
-            
+            opp_list.append({'X': x, 'Y': y, 'theta': yaw, 'type': 'physical', 'id': idx, 
+                             'length': self.opponent_length, 'width': self.opponent_width, 'v': v})
+        self.opp_list = np.array(opp_list)            
 
 
 def main(args=None):

@@ -115,9 +115,8 @@ class ObjectDetect(Node):
         self.visualize_clusters(self.proc_clusters_world)
         #find obstacles
         p_cm_w, phi_w = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body, self.opponent_offset_x, self.opponent_offset_y)
-        print(p_cm_w)
         #visualize obstacles
-        self.visualize_obstacles(p_cm_w)
+        # self.visualize_obstacles(p_cm_w)
         #publish opponent list
         self.publish_opponent_list(p_cm_w, phi_w)
     
@@ -210,14 +209,14 @@ class ObjectDetect(Node):
             cluster_world.append(end)
         if len(cluster_world) > 0:
             clusters_marker_msg = wp_map_pt_vis_msg(cluster_world, self.get_clock().now().to_msg(),
-                                               rgba=[0.0, 255.0, 255.0, 0.8], dur = Duration(seconds =0.3).to_msg())
+                                               rgba=[0.0, 255.0, 255.0, 0.8], dur=Duration(seconds=0.3).to_msg())
             self.clusters_vis_pub.publish(clusters_marker_msg)
 
-    def visualize_obstacles(self, p_cm, rgba=[255.0, 255.0, 255.0, 0.8]):
-        if len(p_cm) > 0:
-            obstacle_marker_msg = wp_map_pt_vis_msg(p_cm, self.get_clock().now().to_msg(),
-                                               rgba, dur = Duration(seconds =0.3).to_msg())
-            self.obstacle_vis_pub.publish(obstacle_marker_msg)
+    # def visualize_obstacles(self, p_cm, rgba=[255.0, 255.0, 255.0, 0.8]):
+    #     if len(p_cm) > 0:
+    #         obstacle_marker_msg = wp_map_pt_vis_msg(p_cm, self.get_clock().now().to_msg(),
+    #                                            rgba, dur = Duration(seconds =0.3).to_msg())
+    #         self.obstacle_vis_pub.publish(obstacle_marker_msg)
     
 
 def main(args=None):
