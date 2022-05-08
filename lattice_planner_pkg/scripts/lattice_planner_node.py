@@ -17,7 +17,7 @@ from time import sleep
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import yaml
 from visualization_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import PoseStamped, Point
+from geometry_msgs.msg import PoseArray
 
 # System
 import os
@@ -35,6 +35,7 @@ class LatticePlanner(Node):
         self.declare_parameter('track_specifier')
         self.declare_parameter('odometry_topic')
         self.declare_parameter('trajectory_topic')
+        self.declare_parameter('opponent_list_topic')
         self.declare_parameter('global_trajectory_topic')
         self.declare_parameter('toppath_topic')
         self.declare_parameter('map_spec_topic')
@@ -52,6 +53,7 @@ class LatticePlanner(Node):
         self.mappath = self.get_parameter('mappath').value
         odom_topic = self.get_parameter('odometry_topic').value
         traj_topic = self.get_parameter('trajectory_topic').value
+        opp_list_topic = self.get_parameter('opponent_list_topic').value
         global_traj_topic = self.get_parameter('global_trajectory_topic').value
         toppath_topic = self.get_parameter('toppath_topic').value
         map_spec_topic = self.get_parameter('map_spec_topic').value
@@ -76,6 +78,7 @@ class LatticePlanner(Node):
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
         self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
+        self.opp_list_sub = self.create_publisher(PoseArray, opp_list_topic, self.opp_list_callback, 1)
         if self.is_publish_global_traj:
             self.global_traj_pub = self.create_publisher(JointTrajectory, global_traj_topic, 1)
         self.toppath_pub = self.create_publisher(String, toppath_topic, 1)
@@ -227,6 +230,10 @@ class LatticePlanner(Node):
 
         # Run Local Planner & Publish Commands
         self.update_local_plan()
+    
+    def opp_list_callback(self, msg):
+        # 
+        pass
 
 
 def main(args=None):
