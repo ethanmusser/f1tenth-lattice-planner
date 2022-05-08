@@ -59,6 +59,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/lattice_planner_node.py
+  scripts/object_detect_node.py
   scripts/pure_pursuit_node.py
   scripts/opp_pose_estimation.py
   scripts/waypoint_logger_service.py

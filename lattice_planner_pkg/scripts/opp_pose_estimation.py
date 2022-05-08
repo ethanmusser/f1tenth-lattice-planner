@@ -4,7 +4,7 @@ import numpy as np
 from laser_scan_helpers import get_point_at_angle
 
 
-def adaptive_breakpoint_detection(r, lam, amin=radians(-135), amax=radians(135), ainc=radians(0.25)):
+def adaptive_breakpoint_detection(r, lam, sigma=0.0, amin=radians(-135), amax=radians(135), ainc=radians(0.25)):
     """
     Implements the adaptive breakpoint detection algorithm proposed by Borges et al. in "Line extraction in 2D range 
     images for mobile robotics" (2004).  
@@ -13,6 +13,8 @@ def adaptive_breakpoint_detection(r, lam, amin=radians(-135), amax=radians(135),
     :type r: np.ndarray
     :param lam: Worst-case incidence angle on a line for point detection in range [0, pi/2] radians
     :type lam: float 
+    :param sigma: Lidar distance resolution
+    :type sigma: float 
     :param amin: Minimum LiDAR angle in radians
     :type amin: float
     :param amax: Maximum LiDAR angle in radians
@@ -38,7 +40,7 @@ def adaptive_breakpoint_detection(r, lam, amin=radians(-135), amax=radians(135),
     for i in range(1, n):
         phi += ainc
         p[i] = np.asarray(get_point_at_angle(r, phi, amin, amax, ainc))
-        Dmax = r[i-1] * sin(ainc) / sin(lam - ainc)
+        Dmax = r[i-1] * sin(ainc) / sin(lam - ainc) + 3 * sigma
         if np.linalg.norm(p[i] - p[i-1]) > Dmax:
             b[i-1] = 1
             b[i] = 1
@@ -62,16 +64,18 @@ def get_clusters(b, p):
 
     # Compute Clusters
     n = np.shape(b)[0]
-    inds = np.nonzero(b)[0]
     c = ([],)
     cidx = 0
     for i in range(1, n):
-        if i in inds and b[i-1]:
-            c = (c, [p[i]])
-            cidx += 1
+        if b[i] and b[i-1]:
+            # c = (c, [p[i]])
+            if c[cidx]:
+                c = c + ([p[i]],)
+                cidx += 1
+            else:
+                c[cidx].append(p[i])
         else:
             c[cidx].append(p[i])
-    
     return c
 
 
