@@ -78,7 +78,7 @@ class LatticePlanner(Node):
         # Subscribers, Publishers, & Timers
         self.odom_sub = self.create_subscription(Odometry, odom_topic, self.odom_callback, 1)
         self.traj_pub = self.create_publisher(JointTrajectory, traj_topic, 1)
-        self.opp_list_sub = self.create_publisher(PoseArray, opp_list_topic, self.opp_list_callback, 1)
+        self.opp_list_sub = self.create_subscription(PoseArray, opp_list_topic, self.opp_list_callback, 1)
         if self.is_publish_global_traj:
             self.global_traj_pub = self.create_publisher(JointTrajectory, global_traj_topic, 1)
         self.toppath_pub = self.create_publisher(String, toppath_topic, 1)
@@ -232,8 +232,24 @@ class LatticePlanner(Node):
         self.update_local_plan()
     
     def opp_list_callback(self, msg):
-        # 
-        pass
+        # Break if no Refline
+        if self.refline is None:
+            return
+        
+        # Get Opponent States
+        opp_list = []
+        for pose in msg.poses:
+            x = pose.position.x
+            y = pose.position.y
+            s = get_s_coord(self.refline, [x, y])[0]
+            v = np.interp(s, self.s, self.vel_rl)
+            quat = [pose.orientation.x, pose.orientation.y,
+                    pose.orientation.z, pose.orientation.w]
+            _, _, yaw = euler_from_quaternion(quat, 'sxyz')
+            opp_list.append([s, x, y, yaw, v])
+        self.opp_list = np.array(opp_list)
+        print(self.opp_list)
+            
 
 
 def main(args=None):

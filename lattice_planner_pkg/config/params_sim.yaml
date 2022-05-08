@@ -5,7 +5,7 @@ lattice_planner_node:
     mappath: '/sim_ws/src/f1tenth_gym_ros/maps/skirkanich_front_sunday'
     odometry_topic: '/ego_racecar/odom'
     trajectory_topic: '/lattice_planner/local_traj'
-    opponent_list_topic: '/object_detect/opponent_list'
+    opponent_list_topic: '/opponent_detect/opponent_list'
     global_trajectory_topic: '/lattice_planner/global_traj'
     toppath_topic: '/lattice_planner/toppath'
     map_spec_topic: '/lattice_planner/map_specifier'
@@ -16,6 +16,8 @@ lattice_planner_node:
     publish_global: False
     yaw_offset: -1.5708
     start_vel: 3.0
+    opponent_length: 0.5
+    opponent_width: 0.3
 
 pure_pursuit_node:
   ros__parameters:
@@ -41,11 +43,11 @@ object_detect_node:
   ros__parameters:
     odometry_topic: '/ego_racecar/odom'
     laserscan_topic: '/scan'
-    obstacle_vis_topic: '/obstacle_detect/obstacle_vis'
-    clusters_vis_topic: '/obstacle_detect/clusters_vis'
+    obstacle_vis_topic: '/opponent_detect/obstacle_vis'
+    clusters_vis_topic: '/opponent_detect/clusters_vis'
     toppath_topic: '/lattice_planner/toppath'
     map_spec_topic: '/lattice_planner/map_specifier'
-    opponent_list_topic: '/object_detect/opponent_list'
+    opponent_list_topic: '/opponent_detect/opponent_list'
     lidar_proc_max_dist: 10.0
     gap_threshold: 1.5
     lambda: 0.1047

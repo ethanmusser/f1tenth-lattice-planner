@@ -115,6 +115,7 @@ class ObjectDetect(Node):
         self.visualize_clusters(self.proc_clusters_world)
         #find obstacles
         p_cm_w, phi_w = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body, self.opponent_offset_x, self.opponent_offset_y)
+        print(p_cm_w)
         #visualize obstacles
         self.visualize_obstacles(p_cm_w)
         #publish opponent list
@@ -124,6 +125,7 @@ class ObjectDetect(Node):
         msg = PoseArray()
         for p, phi in zip(p_cm, phi_w):
             msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = 'map'
             quat = quaternion_from_euler(0.0, 0.0, phi, 'sxyz')
             pose = Pose()
             pose.position.x = p[0]
