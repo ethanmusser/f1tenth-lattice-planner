@@ -171,26 +171,6 @@ class ObjectDetect(Node):
             phi_w_all.append(phi_w)
         return p_cm_w_all, phi_w_all
 
-    def offset_body_frame_point(self, xw, yw, yaw, xoff, yoff):
-        """
-        World frame to any vehicle frame
-        """
-        # Transforation Matrix
-        rot_b = euler_matrix(0.0, 0.0, yaw, 'sxyz')[:3, :3]
-        p_w = np.array([xw, yw, 0.0])
-        print('rot_b', rot_b)
-        tform_b_w = np.zeros((4, 4))
-        tform_b_w[:3, :3] = rot_b
-        tform_b_w[:3, 3] = p_w
-        tform_b_w[-1, -1] = 1
-        tform_b_w = np.linalg.inv(tform_b_w)
-
-        # 
-        p_b = (tform_b_w @ np.concatenate((p_w, [1]))).flatten()
-        p_off_b = p_b + np.array([xoff, yoff, 0.0, 1.0])
-        p_off_w = (np.linalg.inv(tform_b_w) @ p_off_b).flatten()
-        return p_off_w[0], p_off_w[1] 
-
     def body_clusters_to_world(self, odom_msg, clusters):
         clusters_world = copy.deepcopy(clusters)
         for i in range(len(clusters)):
