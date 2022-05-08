@@ -62,16 +62,18 @@ def get_clusters(b, p):
 
     # Compute Clusters
     n = np.shape(b)[0]
-    inds = np.nonzero(b)[0]
     c = ([],)
     cidx = 0
     for i in range(1, n):
-        if i in inds and b[i-1]:
-            c = (c, [p[i]])
-            cidx += 1
+        if b[i] and b[i-1]:
+            # c = (c, [p[i]])
+            if c[cidx]:
+                c = c + ([p[i]],)
+                cidx += 1
+            else:
+                c[cidx].append(p[i])
         else:
             c[cidx].append(p[i])
-    
     return c
 
 
