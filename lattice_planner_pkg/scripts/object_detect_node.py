@@ -8,16 +8,11 @@ import rclpy
 from rclpy.node import Node
 import numpy as np
 import copy
-from scipy.interpolate import splprep, splev
 from std_msgs.msg import String
-from ackermann_msgs.msg import AckermannDriveStamped
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import LaserScan
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from visualization_msgs.msg import Marker, MarkerArray
-from tf_transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix
-from ament_index_python.packages import get_package_share_directory
-import pathlib
+from tf_transformations import quaternion_matrix
 
 
 class ObjectDetect(Node):
@@ -86,24 +81,21 @@ class ObjectDetect(Node):
         for i in range(len(clusters)):
             out_of_bounds = False
             for j in range(len(clusters[i])):
-                # print('post process clusters', clusters[i][j])
                 if not (check_inside_bounds(self.bound1, self.bound2, clusters[i][j])):
                     out_of_bounds = True
                     break
             if not out_of_bounds:
                 proc_indices.append(i)
-                # new_cluster = new_cluster + (cluster,)
         return proc_indices
 
     #Callback functions
     def lidar_callback(self, scan_msg):
         if self.bound1 is None:
             return
+        #Find all breakpoints
         b, p = adaptive_breakpoint_detection(scan_msg.ranges, self.lamb, self.sigma, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
+        #Find all clusters from breakpoitns
         self.clusters_body = get_clusters(b, p)
-
-        #Create 
-        # self.new_clusters = self.postprocess_clusters(self.proc_clusters_world)
 
     def odom_callback(self, odom_msg):
         if self.clusters_body is None:
@@ -115,10 +107,15 @@ class ObjectDetect(Node):
         #create new clusters based on processing
         self.proc_clusters_world = tuple(self.clusters_world[i] for i in proc_indices)
         self.proc_clusters_body = tuple(self.clusters_body[i] for i in proc_indices)
+        #visualize clusters
         self.visualize_clusters(self.proc_clusters_world)
+        #find obstacles
         p_cm, heading = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body)
-        #visualize obstacle
+        #visualize obstacles
         self.visualize_obstacles(p_cm)
+    
+    def local_planner_inputs(self):
+        pass
     
     def toppath_callback(self, msg):
         if self.toppath is None:
@@ -165,8 +162,6 @@ class ObjectDetect(Node):
             r_f = np.cross(np.concatenate((r_diff, [0])), np.array([0,0,1])) 
             r_f_world = self.transform_car_to_global(odom_msg, r_f[0], r_f[1])
             heading = np.arctan2(r_f_world[1], r_f_world[0])
-            print('p_cm', p_cm)
-            print('heading', heading)
             p_cm_all.append(p_cm)
             heading_all.append(heading)
         return p_cm_all, heading_all
@@ -177,17 +172,6 @@ class ObjectDetect(Node):
             for j in range(len(clusters[i])):
                 clusters_world[i][j][0], clusters_world[i][j][1] = self.transform_car_to_global(odom_msg, clusters[i][j][0] , clusters[i][j][1])
         return clusters_world
-
-    # def body_clusters_to_world(self, odom_msg, clusters):
-    #     cluster_world = []
-    #     for i in range(len(clusters)):
-    #         begin = [clusters[i][0][0], clusters[i][0][1]]
-    #         end= [clusters[i][-1][0], clusters[i][-1][1]]
-    #         # x_begin_w, y_begin_w = self.transform_car_to_global(odom_msg, clusters[i][0][0], clusters[i][0][1])
-    #         # x_end_w, y_end_w = self.transform_car_to_global(odom_msg, clusters[i][-1][0], clusters[i][-1][1])
-    #         cluster_world.append(begin)
-    #         cluster_world.append(end)
-    #     return cluster_world
 
     #visualization functions:
     def visualize_clusters(self, clusters):
@@ -202,50 +186,12 @@ class ObjectDetect(Node):
                                                rgba=[0.0, 255.0, 255.0, 0.8], dur = Duration(seconds =0.3).to_msg())
             self.clusters_vis_pub.publish(clusters_marker_msg)
 
-    def visualize_obstacles(self, p_cm):
+    def visualize_obstacles(self, p_cm, rgba=[255.0, 255.0, 255.0, 0.8]):
         if len(p_cm) > 0:
             obstacle_marker_msg = wp_map_pt_vis_msg(p_cm, self.get_clock().now().to_msg(),
-                                               rgba=[255.0, 255.0, 255.0, 0.8], dur = Duration(seconds =0.3).to_msg())
+                                               rgba, dur = Duration(seconds =0.3).to_msg())
             self.obstacle_vis_pub.publish(obstacle_marker_msg)
-    #TODO functions
-
-    def obstacle_detect(self, disparities):
-        pass
-
-    def obstacle_pos(self, data):
-        """
-        Filters through gaps between disparities to find obstacles. Finds location of obstacle
-        Args: 
-            disparities indices
-            processed lidar data
-        
-        Returns:
-            array of [x,y] of all obstacles
-        """
-        pass
     
-    def local_planner_inputs(self):
-        pass
-
-    def stat_dynam_grouping(self):
-        pass
-    
-    def publish_drive_msg(self, desired_angle, speed):
-        """
-        """
-        
-        return 0
-    
-    def traj_callback(self, traj_msg):
-        """
-        """
-        pass
-
-    def pose_callback(self, odom_msg):
-        """
-        """
-        pass
-
 
 def main(args=None):
     rclpy.init(args=args)
