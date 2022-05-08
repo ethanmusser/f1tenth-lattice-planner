@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from visualization_helpers import *
 from nav_msgs.msg import Odometry
-from graph_ltpl_helpers import get_path_dict, get_traj_line
+from graph_ltpl_helpers import get_path_dict, get_traj_line, import_global_traj
 import graph_ltpl
 from graph_ltpl.helper_funcs.src.get_s_coord import get_s_coord
 from graph_ltpl.imp_global_traj.src.import_globtraj_csv import import_globtraj_csv
@@ -80,20 +80,8 @@ class LatticePlanner(Node):
         self.global_traj_timer = self.create_timer(1.0, self.publish_global_traj)
 
     def import_global_traj(self, import_path):
-        # Read File
-        csv_data_temp = np.loadtxt(import_path, delimiter=';')
-
-        # Save Relevant Trajectory Data
-        self.refline = csv_data_temp[:-1, 0:2]
-        # self.width_right = csv_data_temp[:-1, 2]
-        # self.width_left = csv_data_temp[:-1, 3]
-        self.norm_vec = csv_data_temp[:-1, 4:6]
-        self.alpha = csv_data_temp[:-1, 6]
-        self.s = csv_data_temp[:-1, 7]
-        # self.length_rl = np.diff(csv_data_temp[:, 7])
-        # self.psi = csv_data_temp[:-1, 8]
-        self.kappa_rl = csv_data_temp[:-1, 9]
-        self.vel_rl = csv_data_temp[:-1, 10]
+        self.refline, _, _, self.norm_vec, self.alpha, self.s, _, self.kappa_rl, self.vel_rl, self.acc_rl = \
+            import_global_traj(import_path=import_path)
 
     def initialize_graph_ltpl(self):
         # Intialize Graph_LTPL Class
@@ -108,11 +96,6 @@ class LatticePlanner(Node):
         # Read Map Params & Trajectory
         map_params = yaml.safe_load(self.mappath + '.yaml')
         self.import_global_traj(import_path=path_dict['globtraj_input_path'])
-        # self.refline = import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[0]
-        # self.norm_vec = import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[3]
-        # self.alpha = import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[4]
-        # self.vel_rl = import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[6]
-        # self.kappa_rl = import_globtraj_csv(import_path=path_dict['globtraj_input_path'])[7]
         self.traj_line = get_traj_line(self.refline, self.norm_vec, self.alpha)
 
         # Set Start Position
