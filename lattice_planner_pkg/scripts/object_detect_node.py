@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+from dis import dis
 from visualization_helpers import *
 from opp_pose_estimation import *
+from graph_ltpl.online_graph.src.check_inside_bounds import check_inside_bounds
 import rclpy
 from rclpy.node import Node
 import numpy as np
@@ -34,6 +36,7 @@ class ObjectDetect(Node):
         self.declare_parameter('gap_threshold')
         self.declare_parameter('lambda')
         self.declare_parameter('sigma')
+        self.declare_parameter('bound_offset')
 
         # Class Variables
         self.lidar_max_dist = self.get_parameter('lidar_proc_max_dist').value
@@ -41,6 +44,7 @@ class ObjectDetect(Node):
         self.gap_threshold = self.get_parameter('gap_threshold').value
         self.lamb = self.get_parameter('lambda').value
         self.sigma = self.get_parameter('sigma').value
+        self.bound_offset = self.get_parameter('bound_offset').value
 
         #topics
         odom_topic = self.get_parameter('odometry_topic').value
@@ -55,7 +59,13 @@ class ObjectDetect(Node):
         self.obstacle_vis_pub = self.create_publisher(MarkerArray, obstacle_vis_topic, 1)
         self.disparity_vis_pub = self.create_publisher(MarkerArray, disparity_vis_topic, 1)
         self.clusters_vis_pub = self.create_publisher(MarkerArray, clusters_vis_topic, 1)
-    
+
+        #track bounds:
+        # bound1 = (self.__graph_base.refline + self.__graph_base.normvec_normalized
+        #           * np.expand_dims(self.__graph_base.track_width_right, 1))
+        # bound2 = (self.__graph_base.refline - self.__graph_base.normvec_normalized
+        #           * np.expand_dims(self.__graph_base.track_width_left, 1))
+
         #TODO: import map that has inside and outside bounds specified
 
     def preprocess_lidar(self, ranges, angle_inc, range_min):
@@ -87,76 +97,49 @@ class ObjectDetect(Node):
         """
         disparities = np.nonzero(np.diff(ranges) > self.disparity_threshold)[0]
         # disparities = np.append(disparities,[np.argmin(ranges)])
-
+        min_idx = np.radians(45)//angle_inc + 1
+        max_idx = len(ranges) - min_idx
+        disparities = disparities[disparities > min_idx]
+        disparities = disparities[disparities < max_idx]
+        # print('disparities', disparities)
+        # disparities = disparites >
         #convert indices to x,y pos from car frame
         if len(disparities) != 0:
             angle = angle_inc * disparities - (3*np.pi/4)
             car_x = np.take(ranges, [disparities])[0] * np.cos(angle)
             car_y = np.take(ranges, [disparities])[0] * np.sin(angle)
             # print('disparities', disparities)
-            # print('car x', car_x)
-            # print('car y', car_y)
-            return disparities, car_x, car_y
+            return car_x, car_y
         else:
             # print('no disparities')
-            return disparities, [], []
-    
-    def disparities_xy(self, odom_msg, car_x, car_y):
-        disparities_world = np.zeros((len(car_x), 2))
-        for i in range(len(disparities_world)):
-            x, y = self.transform_car_to_global(odom_msg, car_x[i], car_y[i]) 
-            disparities_world[i] = [x, y]
-        return disparities_world
+            return [], []
 
-    def obstacle_detect(self, disparities):
-        pass
+    def postprocess_clusters(self, clusters):
+        print('clusters shape', len(clusters))
+        new_cluster = ()
+        for cluster in clusters:
+            for i in range(len(cluster)):
+                if not (check_inside_bounds(self.bound1, self.bound2, cluster[i])):
+                    print('out of bounds')
+                    break
+            print('valid cluster')
+        # return new_cluster
 
-    def obstacle_pos(self, data):
-        """
-        Filters through gaps between disparities to find obstacles. Finds location of obstacle
-        Args: 
-            disparities indices
-            processed lidar data
-        
-        Returns:
-            array of [x,y] of all obstacles
-        """
-        pass
-
-    def stat_dynam_grouping(self):
-        pass
-    def local_planner_inputs(self):
-        pass
-        
+    #Callback functions
     def lidar_callback(self, scan_msg):
         proc_ranges = self.preprocess_lidar(scan_msg.ranges, scan_msg.angle_increment, scan_msg.range_min)
-        b, p = adaptive_breakpoint_detection(proc_ranges, self.lamb, self.sigma, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
+        b, p = adaptive_breakpoint_detection(scan_msg.ranges, self.lamb, self.sigma, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
         self.clusters = get_clusters(b, p)        
-        #uncomment below code for disparity approach
-        # self.disparities, self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
+        self.postprocess_clusters(self.clusters)
         
-    def visualize_clusters(self, odom_msg, clusters):
-        cluster_world = []
-        for i in range(len(clusters)):
-            if not (clusters[i]):
-                print('empty af')
-                print('i', i)
-                # print(clusters[i])
-            x_begin_w, y_begin_w = self.transform_car_to_global(odom_msg, clusters[i][0][0], clusters[i][0][1])
-            x_end_w, y_end_w = self.transform_car_to_global(odom_msg, clusters[i][-1][0], clusters[i][-1][1])
-            cluster_world.append([x_begin_w, y_begin_w])
-            cluster_world.append([x_end_w, y_end_w])
-        if len(cluster_world) > 0:
-            self.publish_clusters_vis(cluster_world)
-        return cluster_world
+        #disparity approach
+        self.car_x, self.car_y = self.find_disparities(proc_ranges, scan_msg.angle_increment)
 
     def odom_callback(self, odom_msg):
         #uncomment below code for disparity approach
         # self.publish_disparities_vis(odom_msg)
         #uncomment below function for clusters approach
         self.visualize_clusters(odom_msg, self.clusters)
-
-        
 
     def transform_car_to_global(self, odom_msg, goal_x, goal_y):
         quaternion = [odom_msg.pose.pose.orientation.x,
@@ -176,34 +159,60 @@ class ObjectDetect(Node):
         return goal_m[0], goal_m[1]
 
     #visualization functions:
-    def publish_clusters_vis(self, clusters_world):
-        #publishes disparities on rviz
-        print('clusters world shape', np.shape(clusters_world))
-        clusters_marker_msg = wp_map_pt_vis_msg(clusters_world, self.get_clock().now().to_msg(),
+    def visualize_clusters(self, odom_msg, clusters):
+        cluster_world = []
+        for i in range(len(clusters)):
+            x_begin_w, y_begin_w = self.transform_car_to_global(odom_msg, clusters[i][0][0], clusters[i][0][1])
+            x_end_w, y_end_w = self.transform_car_to_global(odom_msg, clusters[i][-1][0], clusters[i][-1][1])
+            cluster_world.append([x_begin_w, y_begin_w])
+            cluster_world.append([x_end_w, y_end_w])
+        if len(cluster_world) > 0:
+            print('clusters world shape', np.shape(cluster_world))
+            clusters_marker_msg = wp_map_pt_vis_msg(cluster_world, self.get_clock().now().to_msg(),
                                                rgba=[0.0, 255.0, 255.0, 0.8], dur = Duration(seconds =0.3).to_msg())
-        self.clusters_vis_pub.publish(clusters_marker_msg)
+            self.clusters_vis_pub.publish(clusters_marker_msg)
 
     def publish_disparities_vis(self, odom_msg):
-        disparities_world = self.disparities_xy(odom_msg, self.car_x, self.car_y)
         #publishes disparities on rviz
-        print('disparity world shape', np.shape(disparities_world))
+        disparities_world = np.zeros((len(self.car_x), 2))
+        for i in range(len(disparities_world)):
+            x, y = self.transform_car_to_global(odom_msg, self.car_x[i], self.car_y[i]) 
+            disparities_world[i] = [x, y]
+        print('disparity world', disparities_world)
         disparity_marker_msg = wp_map_pt_vis_msg(disparities_world, self.get_clock().now().to_msg(),
-                                               rgba=[0.0, 255.0, 255.0, 0.8])
+                                               rgba=[0.0, 255.0, 255.0, 0.8], dur = Duration(seconds =0.3).to_msg())
         if len(disparities_world) > 0:
             self.disparity_vis_pub.publish(disparity_marker_msg)
 
 
+    #TODO functions
 
+    def obstacle_detect(self, disparities):
+        pass
 
+    def obstacle_pos(self, data):
+        """
+        Filters through gaps between disparities to find obstacles. Finds location of obstacle
+        Args: 
+            disparities indices
+            processed lidar data
+        
+        Returns:
+            array of [x,y] of all obstacles
+        """
+        pass
+    
+    def local_planner_inputs(self):
+        pass
 
-
-
+    def stat_dynam_grouping(self):
+        pass
+    
     def publish_drive_msg(self, desired_angle, speed):
         """
         """
         
         return 0
-
     
     def traj_callback(self, traj_msg):
         """

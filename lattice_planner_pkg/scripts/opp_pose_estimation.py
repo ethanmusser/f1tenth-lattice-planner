@@ -44,7 +44,10 @@ def adaptive_breakpoint_detection(r, lam, sigma=0.0, amin=radians(-135), amax=ra
         if np.linalg.norm(p[i] - p[i-1]) > Dmax:
             b[i-1] = 1
             b[i] = 1
-    
+    min_idx = int((np.radians(-90) - amin)//ainc + 1)
+    b[0:min_idx] = 0
+    b[-min_idx:-1] = 0
+    print('b',b)
     return b, p
 
 
@@ -64,7 +67,7 @@ def get_clusters(b, p):
 
     # Compute Clusters
     n = np.shape(b)[0]
-    c = ([],)
+    c = ([p[0]],)
     cidx = 0
     for i in range(1, n):
         if b[i] and b[i-1]:
