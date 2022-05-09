@@ -34,7 +34,7 @@ pure_pursuit_node:
     min_speed: 1.0
     proportional_control: 0.8
     steering_angle_factor: 0.6
-    speed_factor: 0.0
+    speed_factor: 1.0
     waypoint_distance: 0.1
     min_lookahead: 1.2
     max_lookahead: 1.6
@@ -53,7 +53,7 @@ object_detect_node:
     lambda: 0.1047
     sigma: 0.05
     bound_offset: 0.2 
-    opponent_offset_x: 0.1 
+    opponent_offset_x: 0.2
     opponent_offset_y: 0.0 
 
 waypoint_logger_service:

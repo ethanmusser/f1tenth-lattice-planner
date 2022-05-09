@@ -115,7 +115,6 @@ class ObjectDetect(Node):
         self.visualize_clusters(self.proc_clusters_world)
         #find obstacles
         p_cm_w, phi_w = self.estimate_opponent_pose(odom_msg, self.proc_clusters_body, self.opponent_offset_x, self.opponent_offset_y)
-        print(p_cm_w)
         #visualize obstacles
         self.visualize_obstacles(p_cm_w)
         #publish opponent list
@@ -185,9 +184,11 @@ class ObjectDetect(Node):
             p_c_w = self.transform_car_to_global(odom_msg, p_c_b[0], p_c_b[1])
             r_diff = p_i - p_i1
             r_f_b = np.cross(np.concatenate((r_diff, [0])), np.array([0,0,1])) 
-            r_f_w = self.transform_car_to_global(odom_msg, r_f_b[0], r_f_b[1])
-            r_f_w = r_f_w / np.linalg.norm(r_f_w)
-            p_cm_w = p_c_w + np.array([xoff, yoff]) @ r_f_w
+            r_f_b = r_f_b / np.linalg.norm(r_f_b)
+            p_cm_b = p_c_b + (np.array([xoff, yoff]) * r_f_b[0:2].T)
+            p_cm_w = self.transform_car_to_global(odom_msg, p_cm_b[0], p_cm_b[1])
+            p_c_cw_vec = np.asarray(p_cm_w) - np.asarray(p_c_w)
+            r_f_w = p_c_cw_vec
             phi_w = np.arctan2(r_f_w[1], r_f_w[0])
             p_cm_w_all.append(p_cm_w)
             phi_w_all.append(phi_w)
