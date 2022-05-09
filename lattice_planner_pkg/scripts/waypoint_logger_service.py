@@ -10,7 +10,7 @@ from ament_index_python.packages import get_package_share_directory
 import csv
 import numpy as np
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
-from laser_scan_helpers import get_range_at_angle
+from laser_scan_helpers import get_range_at_a
 
 # Messages & Services
 from lattice_planner_pkg.srv import BasicService
@@ -55,9 +55,9 @@ class OdometryLogger(Node):
         """
         Odometry mesage callback.
         """
-        self.right_distance = get_range_at_angle(
+        self.right_distance = get_range_at_a(
             scan_msg.ranges, -0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
-        self.left_distance = get_range_at_angle(
+        self.left_distance = get_range_at_a(
             scan_msg.ranges,  0.5*np.pi, scan_msg.angle_min, scan_msg.angle_max, scan_msg.angle_increment)
 
     def logger_callback(self, request, response):
