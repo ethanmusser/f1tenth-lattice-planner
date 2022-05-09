@@ -30,7 +30,7 @@ pure_pursuit_node:
     waypoint_vis_topic: '/pure_pursuit/waypoint'
     lookahead_method: 'curvature'
     use_global_traj: False
-    has_opponent: False
+    has_opponent: True
     steering_angle_bound: 0.4
     desired_speed: 4.5
     min_speed: 1.0
@@ -52,7 +52,7 @@ object_detect_node:
     opponent_list_topic: '/opponent_detect/opponent_list'
     lidar_proc_max_dist: 10.0
     gap_threshold: 1.5
-    lambda: 0.1047
+    lambda: 0.0872665 #0.1047
     sigma: 0.05
     bound_offset: 0.2 
     opponent_offset_x: 0.1 
