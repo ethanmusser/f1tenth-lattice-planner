@@ -1,8 +1,8 @@
 lattice_planner_node:
   ros__parameters:
-    track_specifier: 'skirkanich_front_sunday'
-    toppath: '/sim_ws/src/lattice_planner_pkg'
-    mappath: '/sim_ws/src/f1tenth_gym_ros/maps/skirkanich_front_sunday'
+    track_specifier: 'levine'
+    toppath: '/f1tenth_ws/src/lattice_planner_pkg'
+    mappath: '/f1tenth_ws/src/f1tenth_gym_ros/maps/levine_hallway_sunday'
     odometry_topic: '/pf/pose/odom'
     trajectory_topic: '/lattice_planner/local_traj'
     opponent_list_topic: '/opponent_detect/opponent_list'
@@ -22,7 +22,7 @@ lattice_planner_node:
 
 pure_pursuit_node:
   ros__parameters:
-    sparse_waypoint_filename: 'traj_race_cl_skirkanich4'
+    sparse_waypoint_filename: 'traj_ltpl_cl_levine'
     drive_topic: '/drive'
     trajectory_topic: '/lattice_planner/local_traj'
     global_trajectory_topic: '/lattice_planner/global_traj'
@@ -36,14 +36,14 @@ pure_pursuit_node:
     min_speed: 1.0
     proportional_control: 0.8 #1.0
     steering_angle_factor: 0.6
-    speed_factor: 1.0
+    speed_factor: -1.0
     waypoint_distance: 0.1
     min_lookahead: 1.2
     max_lookahead: 1.6
 
 object_detect_node:
   ros__parameters:
-    odometry_topic: '/ego_racecar/odom'
+    odometry_topic: '/pf/pose/odom'
     laserscan_topic: '/scan'
     obstacle_vis_topic: '/opponent_detect/obstacle_vis'
     clusters_vis_topic: '/opponent_detect/clusters_vis'
@@ -52,7 +52,7 @@ object_detect_node:
     opponent_list_topic: '/opponent_detect/opponent_list'
     lidar_proc_max_dist: 10.0
     gap_threshold: 1.5
-    lambda: 0.06 #0.1047
+    lambda: 0.04 #0.1047
     sigma: 0.05
     bound_offset: 0.2 
     opponent_offset_x: 0.2

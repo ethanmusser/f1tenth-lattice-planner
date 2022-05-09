@@ -249,7 +249,7 @@ class PurePursuit(Node):
         # Calculate curvature/steering angle
         desired_angle = self.compute_steering_angle(odom_msg, goal_y_body, lookahead)
         # Publish drive message, don't forget to limit the steering angle.
-        self.publish_drive_msg(desired_angle, self.vel[cur_idx])
+        self.publish_drive_msg(desired_angle, self.vel[cur_idx+1 % len(self.vel)])
         self.publish_waypoint_vis_msg(x_w, y_w)
 
     def opp_drive_callback(self):
