@@ -2,7 +2,7 @@ lattice_planner_node:
   ros__parameters:
     track_specifier: 'levine'
     toppath: '/f1tenth_ws/src/lattice_planner_pkg'
-    mappath: '/f1tenth_ws/src/f1tenth_gym_ros/maps/levine_lobby'
+    mappath: '/f1tenth_ws/src/f1tenth_gym_ros/maps/levine_lobby_2'
     odometry_topic: '/pf/pose/odom'
     trajectory_topic: '/lattice_planner/local_traj'
     opponent_list_topic: '/opponent_detect/opponent_list'
@@ -22,7 +22,7 @@ lattice_planner_node:
 
 pure_pursuit_node:
   ros__parameters:
-    sparse_waypoint_filename: 'traj_ltpl_cl_levine_lobby'
+    sparse_waypoint_filename: 'traj_ltpl_cl_levine_lobby_2'
     drive_topic: '/drive'
     trajectory_topic: '/lattice_planner/local_traj'
     global_trajectory_topic: '/lattice_planner/global_traj'
@@ -62,5 +62,5 @@ waypoint_logger_service:
   ros__parameters:
     odometry_topic: '/pf/pose/odom'
     lidar_scan_topic: '/scan'
-    log_filepath: '/f1tenth_ws/src/lattice_planner_pkg/inputs/waypoints/levine_lobby.csv'
+    log_filepath: '/f1tenth_ws/src/lattice_planner_pkg/inputs/waypoints/levine_lobby_2.csv'
 
